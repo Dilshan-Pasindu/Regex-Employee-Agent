@@ -10,6 +10,7 @@ using EmployeeMcpServer.Data;
 using EmployeeMcpServer.Services;
 using EmployeeMcpServer.Tools;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -18,6 +19,12 @@ using Microsoft.Extensions.Logging;
 Console.SetOut(Console.Error);
 
 var builder = Host.CreateApplicationBuilder(args);
+
+// Ensure appsettings.json is loaded from the binary directory and environment variables
+builder.Configuration
+    .SetBasePath(AppContext.BaseDirectory)
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables();
 
 // ---- Logging: write ONLY to STDERR, never STDOUT ----
 builder.Logging.ClearProviders();
