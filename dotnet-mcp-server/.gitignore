@@ -1,0 +1,15 @@
+## .NET build outputs
+bin/
+obj/
+*.user
+
+## Secrets — never commit real credentials
+appsettings.json
+
+## Environment files
+.env
+*.env
+
+## macOS
+.DS_Store
+
