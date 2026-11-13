@@ -1,0 +1,143 @@
+# =============================================================================
+# Root .gitignore — Employee Management Agentic Application
+# Technologies: .NET 8 (C#), Rust (Cargo), Node.js / React, Python, MySQL
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Operating System Files
+# -----------------------------------------------------------------------------
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+
+# Linux
+*~
+.directory
+
+# -----------------------------------------------------------------------------
+# Environment & Secrets (Never commit secrets or credentials)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+*.env
+*.pem
+*.key
+*.cert
+*.pfx
+
+# Explicitly preserve environment configuration templates
+!.env.example
+!.env.template
+!.env.sample
+
+# -----------------------------------------------------------------------------
+# .NET / C# Build Artifacts & Configuration
+# -----------------------------------------------------------------------------
+**/bin/
+**/obj/
+**/[Oo]ut/
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# User-specific & local cache files
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+*.userprefs
+*.ide/
+
+# Visual Studio & Rider caches
+.vs/
+_ReSharper*/
+*.DotSettings.user
+
+# Application settings containing sensitive credentials
+**/appsettings.json
+**/appsettings.*.json
+
+# Explicitly preserve application settings templates
+!**/appsettings.example.json
+!**/appsettings.template.json
+!**/appsettings.sample.json
+
+# -----------------------------------------------------------------------------
+# Rust / Cargo
+# -----------------------------------------------------------------------------
+**/target/
+**/*.rs.bk
+*.pdb
+
+# Explicitly preserve Cargo.lock for binary/application reproducibility
+!Cargo.lock
+
+# -----------------------------------------------------------------------------
+# Node.js / React / Frontend & Backend (Phase 3)
+# -----------------------------------------------------------------------------
+**/node_modules/
+**/dist/
+**/build/
+.next/
+.vite/
+.eslintcache
+.stylelintcache
+
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Explicitly preserve package lock files
+!package-lock.json
+!yarn.lock
+!pnpm-lock.yaml
+
+# -----------------------------------------------------------------------------
+# Python (if FastAPI / scripts are used)
+# -----------------------------------------------------------------------------
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+**/.venv/
+**/venv/
+**/env/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+
+# -----------------------------------------------------------------------------
+# IDE & Code Editors
+# -----------------------------------------------------------------------------
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+
+# VS Code - Ignore local workspace storage while preserving team configurations
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# -----------------------------------------------------------------------------
+# Logs & General Temp Files
+# -----------------------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+
