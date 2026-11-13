@@ -76,26 +76,17 @@ CREATE TABLE IF NOT EXISTS Employees (
         REFERENCES Designations (DesignationID)
         ON UPDATE CASCADE ON DELETE RESTRICT,
     CONSTRAINT CK_Employees_Salary   CHECK (Salary >= 0),
-    CONSTRAINT CK_Employees_Status   CHECK (Status IN ('Active', 'Inactive', 'On Leave'))
+    CONSTRAINT CK_Employees_Status   CHECK (Status IN ('Active', 'Inactive', 'On Leave')),
+    INDEX IX_Employees_DepartmentID  (DepartmentID),
+    INDEX IX_Employees_DesignationID (DesignationID),
+    INDEX IX_Employees_Status        (Status)
 ) ENGINE=InnoDB
   AUTO_INCREMENT=1001
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
--- 5. Indexes for common filtering and lookup operations
--- ---------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS IX_Employees_DepartmentID
-    ON Employees (DepartmentID);
-
-CREATE INDEX IF NOT EXISTS IX_Employees_DesignationID
-    ON Employees (DesignationID);
-
-CREATE INDEX IF NOT EXISTS IX_Employees_Status
-    ON Employees (Status);
-
--- ---------------------------------------------------------------------------
--- 6. Seed Departments  (6 rows)
+-- 5. Seed Departments  (6 rows)
 -- ---------------------------------------------------------------------------
 INSERT INTO Departments (DepartmentName, Description)
 SELECT src.DepartmentName, src.Description
