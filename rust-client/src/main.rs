@@ -9,21 +9,13 @@
 // NO LLM. NO AI. Pure Regex.
 // =============================================================================
 
-mod config;
-mod errors;
-mod models;
-mod mcp;
-mod intent;
-mod process;
-mod confirmation;
-
-use crate::{
+use employee_mcp_client::{
     config::Config,
-    mcp::client::McpClient,
+    confirmation::request_confirmation,
     intent::detector::detect_intent,
     intent::patterns::{RE_EXIT, RE_HELP},
-    models::Intent,
-    confirmation::request_confirmation,
+    mcp::client::McpClient,
+    models::{Intent, IntentResult, ToolExecutionResult},
 };
 
 use serde_json::{json, Value};
@@ -163,7 +155,7 @@ async fn main() -> anyhow::Result<()> {
 // Build MCP tool arguments from extracted parameters
 // Returns Err with a helpful message if required params are missing.
 // =============================================================================
-fn build_tool_args(intent: &crate::models::IntentResult) -> Result<Value, String> {
+fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
     let p = &intent.params;
     match &intent.intent {
 
@@ -275,7 +267,7 @@ fn build_tool_args(intent: &crate::models::IntentResult) -> Result<Value, String
 // Pretty-print tool results to the terminal
 // Supports selective field projection when the user requests specific fields
 // =============================================================================
-fn display_result(result: &crate::models::ToolExecutionResult, requested_fields: &[String]) {
+fn display_result(result: &ToolExecutionResult, requested_fields: &[String]) {
     println!();
     if result.success {
         println!("  ✓ Success{}", result.message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default());
