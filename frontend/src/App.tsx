@@ -9,6 +9,7 @@ import { ConfirmationModal } from './components/ConfirmationModal';
 import { ToolCatalogDrawer } from './components/ToolCatalogDrawer';
 import { sendChat } from './api/client';
 import type { ChatMessage, ConfirmationState } from './types';
+import botAvatar from './assets/bot-avatar.jpg';
 import './index.css';
 
 function nanoid() {
@@ -147,16 +148,18 @@ export default function App() {
       >
         {/* Left: avatar + title */}
         <div className="flex items-center gap-3">
-          <div style={{
-            width: 42, height: 42,
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 22,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-          }}>
-            🤖
-          </div>
+          <img
+            src={botAvatar}
+            alt="Employee Agent Logo"
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 14,
+              objectFit: 'cover',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
+              border: '2px solid rgba(255,255,255,0.4)',
+            }}
+          />
           <div>
             <h1 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.2, margin: 0 }}>
               Employee Agent

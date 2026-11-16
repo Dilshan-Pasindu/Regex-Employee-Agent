@@ -7,6 +7,7 @@ import type { ChatMessage } from '../types';
 import { StepTracePanel } from './StepTrace';
 import { EmployeeTable } from './EmployeeTable';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import botAvatar from '../assets/bot-avatar.jpg';
 
 // ---------- Intent badge --------------------------------------------------
 function IntentBadge({ intent }: { intent: string }) {
@@ -32,12 +33,20 @@ function IntentBadge({ intent }: { intent: string }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3 items-start msg-enter">
-      <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: 'linear-gradient(135deg,#7c3aed,#db2777)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, marginTop: 2,
-      }}>🤖</div>
+      <img
+        src={botAvatar}
+        alt="Bot"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 11,
+          objectFit: 'cover',
+          flexShrink: 0,
+          marginTop: 2,
+          boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
+          border: '1.5px solid rgba(124,58,237,0.3)',
+        }}
+      />
       <div style={{
         background: 'var(--bot-bubble)',
         color: 'var(--bot-text)',
@@ -61,12 +70,20 @@ function AgentBubble({ msg }: { msg: ChatMessage }) {
 
   return (
     <div className="flex gap-3 items-start msg-enter">
-      <div style={{
-        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-        background: 'linear-gradient(135deg,#7c3aed,#db2777)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 16, marginTop: 2,
-      }}>🤖</div>
+      <img
+        src={botAvatar}
+        alt="Bot"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 11,
+          objectFit: 'cover',
+          flexShrink: 0,
+          marginTop: 2,
+          boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
+          border: '1.5px solid rgba(124,58,237,0.3)',
+        }}
+      />
 
       <div style={{
         background: 'var(--bot-bubble)',
@@ -158,13 +175,31 @@ function WelcomeScreen({ onChip }: { onChip: (text: string) => void }) {
       gap: 20,
     }}>
       {/* Avatar */}
-      <div style={{
-        width: 80, height: 80, borderRadius: 24,
-        background: 'linear-gradient(135deg,#7c3aed,#db2777,#f97316)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 40,
-        boxShadow: '0 8px 32px rgba(124,58,237,0.35)',
-      }}>🤖</div>
+      <div style={{ position: 'relative' }}>
+        <img
+          src={botAvatar}
+          alt="Employee Agent Logo"
+          style={{
+            width: 88,
+            height: 88,
+            borderRadius: 28,
+            objectFit: 'cover',
+            boxShadow: '0 12px 36px rgba(124,58,237,0.35)',
+            border: '3px solid rgba(255,255,255,0.8)',
+            display: 'block',
+          }}
+        />
+        <div style={{
+          position: 'absolute',
+          bottom: 2,
+          right: 2,
+          width: 18,
+          height: 18,
+          borderRadius: '50%',
+          background: '#10b981',
+          border: '3px solid var(--surface)',
+        }} />
+      </div>
 
       {/* Greeting */}
       <div style={{ textAlign: 'center' }}>
