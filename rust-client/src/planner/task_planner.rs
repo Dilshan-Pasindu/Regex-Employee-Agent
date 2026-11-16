@@ -118,6 +118,176 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
                 }
                 json!(map)
             }
+            Intent::UpdateEmployee => {
+                let mut map = serde_json::Map::new();
+                if let Some(id) = ir.params.employee_id {
+                    map.insert("employeeId".to_string(), json!(id));
+                }
+                if let Some(ref f) = ir.params.first_name {
+                    map.insert("firstName".to_string(), json!(f));
+                }
+                if let Some(ref l) = ir.params.last_name {
+                    map.insert("lastName".to_string(), json!(l));
+                }
+                if let Some(ref e) = ir.params.email {
+                    map.insert("email".to_string(), json!(e));
+                }
+                if let Some(ref ph) = ir.params.phone {
+                    map.insert("phone".to_string(), json!(ph));
+                }
+                if let Some(ref st) = ir.params.status {
+                    map.insert("status".to_string(), json!(st));
+                }
+                if let Some(sal) = ir.params.salary {
+                    map.insert("salary".to_string(), json!(sal));
+                }
+                if let Some(ref d) = ir.params.hire_date {
+                    map.insert("hireDate".to_string(), json!(d));
+                }
+                // Handle department update (either ID directly or department name resolution)
+                let dept_val = ir
+                    .params
+                    .department_name
+                    .as_ref()
+                    .or_else(|| {
+                        if ir.params.field_to_update.as_deref() == Some("department") {
+                            ir.params.new_value.as_ref()
+                        } else {
+                            None
+                        }
+                    });
+                if let Some(d_val) = dept_val {
+                    if let Ok(id) = d_val.parse::<i32>() {
+                        map.insert("departmentId".to_string(), json!(id));
+                    } else {
+                        let dept_id = match d_val.to_lowercase().trim() {
+                            "it" => Some(1),
+                            "hr" => Some(2),
+                            "finance" => Some(3),
+                            "sales" => Some(4),
+                            "engineering" => Some(5),
+                            "operations" => Some(6),
+                            _ => None,
+                        };
+                        if let Some(did) = dept_id {
+                            map.insert("departmentId".to_string(), json!(did));
+                        }
+                    }
+                }
+                // Handle designation update
+                let des_val = ir
+                    .params
+                    .designation_name
+                    .as_ref()
+                    .or_else(|| {
+                        if ir.params.field_to_update.as_deref() == Some("designation") {
+                            ir.params.new_value.as_ref()
+                        } else {
+                            None
+                        }
+                    });
+                if let Some(des_str) = des_val {
+                    if let Ok(id) = des_str.parse::<i32>() {
+                        map.insert("designationId".to_string(), json!(id));
+                    } else {
+                        let desig_id = match des_str.to_lowercase().trim() {
+                            "software engineer" => Some(1),
+                            "senior software engineer" => Some(2),
+                            "team lead" => Some(3),
+                            "project manager" => Some(4),
+                            "qa engineer" => Some(5),
+                            "business analyst" => Some(6),
+                            "hr executive" => Some(7),
+                            "accountant" => Some(8),
+                            "sales executive" => Some(9),
+                            "devops engineer" => Some(10),
+                            "ui/ux designer" | "designer" => Some(11),
+                            "intern" => Some(12),
+                            _ => None,
+                        };
+                        if let Some(gid) = desig_id {
+                            map.insert("designationId".to_string(), json!(gid));
+                        }
+                    }
+                }
+                json!(map)
+            }
+            Intent::AddEmployee => {
+                let mut map = serde_json::Map::new();
+                if let Some(ref f) = ir.params.first_name {
+                    map.insert("firstName".to_string(), json!(f));
+                }
+                if let Some(ref l) = ir.params.last_name {
+                    map.insert("lastName".to_string(), json!(l));
+                }
+                if let Some(ref e) = ir.params.email {
+                    map.insert("email".to_string(), json!(e));
+                }
+                if let Some(ref ph) = ir.params.phone {
+                    map.insert("phone".to_string(), json!(ph));
+                }
+                if let Some(sal) = ir.params.salary {
+                    map.insert("salary".to_string(), json!(sal));
+                } else {
+                    map.insert("salary".to_string(), json!(0.0));
+                }
+                map.insert(
+                    "hireDate".to_string(),
+                    json!(ir.params.hire_date.as_deref().unwrap_or("2024-01-01")),
+                );
+                map.insert(
+                    "status".to_string(),
+                    json!(ir.params.status.as_deref().unwrap_or("Active")),
+                );
+
+                // Department ID resolution
+                let dept_id = if let Some(ref d_val) = ir.params.department_name {
+                    if let Ok(id) = d_val.parse::<i32>() {
+                        id
+                    } else {
+                        match d_val.to_lowercase().trim() {
+                            "it" => 1,
+                            "hr" => 2,
+                            "finance" => 3,
+                            "sales" => 4,
+                            "engineering" => 5,
+                            "operations" => 6,
+                            _ => 1,
+                        }
+                    }
+                } else {
+                    1
+                };
+                map.insert("departmentId".to_string(), json!(dept_id));
+
+                // Designation ID resolution
+                let desig_id = if let Some(ref des_val) = ir.params.designation_name {
+                    if let Ok(id) = des_val.parse::<i32>() {
+                        id
+                    } else {
+                        match des_val.to_lowercase().trim() {
+                            "software engineer" => 1,
+                            "senior software engineer" => 2,
+                            "team lead" => 3,
+                            "project manager" => 4,
+                            "qa engineer" => 5,
+                            "business analyst" => 6,
+                            "hr executive" => 7,
+                            "accountant" => 8,
+                            "sales executive" => 9,
+                            "devops engineer" => 10,
+                            "ui/ux designer" | "designer" => 11,
+                            "intern" => 12,
+                            _ => 1,
+                        }
+                    }
+                } else {
+                    1
+                };
+                map.insert("designationId".to_string(), json!(desig_id));
+
+                json!(map)
+            }
             _ => json!({}),
         };
 
@@ -141,13 +311,20 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
         step_num += 1;
     }
 
-    // Step 4: Display field selection projection
-    if !requested_fields.is_empty() {
+    // Step 4: Display field selection projection (only for read operations, not write/updates)
+    let is_update = ir.intent == Intent::UpdateEmployee;
+    let effective_requested_fields = if is_update {
+        Vec::new()
+    } else {
+        requested_fields
+    };
+
+    if !effective_requested_fields.is_empty() {
         steps.push(ExecutionStep {
             step_number: step_num,
             description: format!(
                 "Project requested display fields: [{}]",
-                requested_fields.join(", ")
+                effective_requested_fields.join(", ")
             ),
             tool_name: None,
             arguments: None,
@@ -158,7 +335,7 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
         intent_label: ir.intent.tool_name().unwrap_or("unknown").to_string(),
         steps,
         extracted_conditions: conditions,
-        requested_fields,
+        requested_fields: effective_requested_fields,
         requires_confirmation: ir.intent.requires_confirmation(),
     }
 }
