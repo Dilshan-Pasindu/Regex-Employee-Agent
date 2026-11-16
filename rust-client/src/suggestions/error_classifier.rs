@@ -2,6 +2,7 @@
 // suggestions/error_classifier.rs — Deterministic prompt error classification
 // =============================================================================
 
+use crate::intent::patterns::{RE_BARE_FIND_EMPLOYEE, RE_INVALID_ID};
 use crate::models::{Intent, IntentResult};
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -28,17 +29,6 @@ static RE_DELETE_OP: Lazy<Regex> = Lazy::new(|| {
 
 static RE_WEATHER_OR_UNRELATED: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)\b(weather|forecast|joke|movie|recipe|dinner|song|music|game|football|news|time\s+is\s+it|hello|hi|hey|how\s+are\s+you)\b").unwrap()
-});
-
-static RE_INVALID_ID: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(
-        r"(?i)\b(?:find|show|get|lookup)\s+employee\s+(?:id\s*[:#]?\s*)?(?P<id>[a-zA-Z]{1,15})\b",
-    )
-    .unwrap()
-});
-
-static RE_BARE_FIND_EMPLOYEE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(?i)^(find|show|get|search|lookup)\s+(?:an?\s+)?employee\s*(\?|\.)?$").unwrap()
 });
 
 static RE_BARE_UPDATE_EMPLOYEE: Lazy<Regex> = Lazy::new(|| {
@@ -102,17 +92,28 @@ pub fn classify_prompt_error(prompt: &str, ir: &IntentResult) -> ClassificationR
     }
 
     // 4. Check for invalid non-numeric employee ID: "Find employee abc"
-    if let Some(caps) = RE_INVALID_ID.captures(p) {
-        let val = caps.name("id").map(|m| m.as_str().to_string());
-        // Avoid classifying valid keywords like "details" or "all"
-        if let Some(ref v) = val {
-            let lower = v.to_lowercase();
-            if lower != "details" && lower != "all" && lower != "list" && lower != "count" {
-                return ClassificationResult {
-                    error_type: PromptErrorType::InvalidParameter,
-                    user_explanation: "The employee ID appears to be invalid. Please provide a valid numeric employee ID.".to_string(),
-                    detected_entity: val,
-                };
+    if !crate::intent::patterns::RE_EXTRACT_ID.is_match(p) {
+        if let Some(caps) = RE_INVALID_ID.captures(p) {
+            let val = caps.name("id").map(|m| m.as_str().to_string());
+            // Avoid classifying valid keywords like "details" or "all"
+            if let Some(ref v) = val {
+                let lower = v.to_lowercase();
+                if lower != "id"
+                    && lower != "details"
+                    && lower != "all"
+                    && lower != "list"
+                    && lower != "count"
+                    && lower != "records"
+                    && lower != "record"
+                    && lower != "data"
+                    && lower != "info"
+                {
+                    return ClassificationResult {
+                        error_type: PromptErrorType::InvalidParameter,
+                        user_explanation: "The employee ID appears to be invalid. Please provide a valid numeric employee ID.".to_string(),
+                        detected_entity: val,
+                    };
+                }
             }
         }
     }

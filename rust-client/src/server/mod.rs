@@ -281,7 +281,11 @@ async fn process_handler(
             result: None,
             success: false,
             requires_confirmation: None,
-            message: Some(validation.errors.join("; ")),
+            message: Some(if !suggestion_out.explanation.is_empty() {
+                suggestion_out.explanation
+            } else {
+                validation.errors.join("; ")
+            }),
             suggestions: Some(suggestion_out.suggestions),
             execution_plan: Some(json!(plan)),
         }));
