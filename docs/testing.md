@@ -1,6 +1,6 @@
 # Testing Guide
 
-## Rust Regex Engine — 43 Unit Tests
+## Rust Regex Engine — 44 Unit Tests
 
 ```bash
 cd rust-client

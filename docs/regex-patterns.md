@@ -12,9 +12,10 @@ All intent patterns are defined in `rust-client/src/intent/patterns.rs` using `o
 
 | Pattern | Matches |
 |---------|---------|
-| `(?i)\b(show\|list\|display\|get\|fetch\|view)\s+(all\|every\|the)\s+employees?\b` | "show all employees", "list every employee" |
-| `(?i)\ball\s+employees?\b` | "all employees" |
-| `(?i)\bemployees?\s+list\b` | "employees list" |
+| `(?i)^(show\|list\|display\|get\|fetch\|view)\s+(all\s+)?employees?(?:\s+(?:details?\|info(?:rmation)?\|records?\|data\|list))?$` | "show all employees", "show all employees details", "list employees details" |
+| `(?i)^all\s+employees?(?:\s+(?:details?\|info(?:rmation)?\|records?\|data\|list))?$` | "all employees", "all employee details" |
+| `(?i)^employees?\s+(list\|records?\|details?\|data\|info(?:rmation)?)$` | "employee details", "employees list", "employees records" |
+| `(?i)^(give\s+me\s+\|show\s+me\s+)?all\s+employees?(?:\s+(?:details?\|info(?:rmation)?\|records?\|data\|list))?$` | "show me all employees details" |
 
 **Does not match:** `show employee 1001` (ID present → `get_employee_by_id`)
 

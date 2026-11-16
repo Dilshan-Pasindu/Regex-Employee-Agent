@@ -50,6 +50,15 @@ fn test_06_get_all_employees_records_phrasing() {
     assert_eq!(result.intent, Intent::GetAllEmployees);
 }
 
+#[test]
+fn test_06b_get_all_employees_with_details_keyword() {
+    assert_eq!(detect_intent("show all employees details").intent, Intent::GetAllEmployees);
+    assert_eq!(detect_intent("show all employee details").intent, Intent::GetAllEmployees);
+    assert_eq!(detect_intent("show employees details").intent, Intent::GetAllEmployees);
+    assert_eq!(detect_intent("list all employees info").intent, Intent::GetAllEmployees);
+    assert_eq!(detect_intent("display all employees data").intent, Intent::GetAllEmployees);
+}
+
 // -----------------------------------------------------------------------------
 // Category 2: GetEmployeeById (Extraction & Formatting)
 // -----------------------------------------------------------------------------

@@ -8,14 +8,15 @@ use regex::Regex;
 
 // ---------------------------------------------------------------------------
 // get_all_employees patterns
-// Matches: "show all employees", "list employees", "display all staff", etc.
+// Matches: "show all employees", "show all employees details", "list employees", "display all staff", etc.
 // ---------------------------------------------------------------------------
 pub static RE_GET_ALL_EMPLOYEES: Lazy<Vec<Regex>> = Lazy::new(|| vec![
-    Regex::new(r"(?i)^(show|list|display|get|fetch|view)\s+(all\s+)?employees?$").unwrap(),
-    Regex::new(r"(?i)^(show|list|display|get|fetch|view)\s+all\s+staff$").unwrap(),
-    Regex::new(r"(?i)^all\s+employees?$").unwrap(),
-    Regex::new(r"(?i)^employee\s+(list|records?|details?)$").unwrap(),
-    Regex::new(r"(?i)^(give\s+me\s+|show\s+me\s+)?all\s+employees?$").unwrap(),
+    Regex::new(r"(?i)^(show|list|display|get|fetch|view)\s+(all\s+)?employees?(?:\s+(?:details?|info(?:rmation)?|records?|data|list))?$").unwrap(),
+    Regex::new(r"(?i)^(show|list|display|get|fetch|view)\s+(?:the\s+)?employees?\s+(?:details?|info(?:rmation)?|records?|data|list)$").unwrap(),
+    Regex::new(r"(?i)^(show|list|display|get|fetch|view)\s+all\s+staff(?:\s+(?:details?|info(?:rmation)?|records?|data|list))?$").unwrap(),
+    Regex::new(r"(?i)^all\s+employees?(?:\s+(?:details?|info(?:rmation)?|records?|data|list))?$").unwrap(),
+    Regex::new(r"(?i)^employees?\s+(list|records?|details?|data|info(?:rmation)?)$").unwrap(),
+    Regex::new(r"(?i)^(give\s+me\s+|show\s+me\s+)?all\s+employees?(?:\s+(?:details?|info(?:rmation)?|records?|data|list))?$").unwrap(),
 ]);
 
 // ---------------------------------------------------------------------------

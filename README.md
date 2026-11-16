@@ -49,7 +49,7 @@ Spillabs-intern/
 │   │   ├── process/              # .NET child process manager
 │   │   └── main.rs               # CLI mode + --server mode
 │   └── tests/
-│       └── regex_tests.rs        # 43 deterministic regex tests
+│       └── regex_tests.rs        # 44 deterministic regex tests
 ├── backend/                      # Phase 3 Layer 2 — Python/FastAPI (port 5000)
 │   ├── routers/
 │   │   ├── chat.py               # POST /api/chat
@@ -215,7 +215,7 @@ Full interactive docs: **http://localhost:5000/docs**
 ## 🧪 Running Tests
 
 ```bash
-# Rust regex engine — 43 tests
+# Rust regex engine — 44 tests
 cd rust-client
 cargo test
 
