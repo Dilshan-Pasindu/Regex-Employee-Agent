@@ -192,7 +192,7 @@ pub static RE_UPDATE_EMPLOYEE: Lazy<Vec<Regex>> = Lazy::new(|| {
     let assign = Vocabulary::alternation(&v.assignment_words);
 
     vec![
-        Regex::new(&format!(r"(?i)({verbs})\s+employee\s+(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})\s+(?P<field>department|designation|salary|status|phone|email|first\s*name|last\s*name|hire\s*date|name)\s+({assign})\s+(?P<val>.+)$")).unwrap(),
+        Regex::new(&format!(r"(?i)({verbs})\s+employee\s+(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})(?:'s)?\s+(?P<field>department|designation|salary|status|phone|email|first\s*name|last\s*name|hire\s*date|name)\s+({assign})\s+(?P<val>.+)$")).unwrap(),
         Regex::new(&format!(r"(?i)({verbs})\s+(?:employee\s+)?(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})")).unwrap(),
     ]
 });

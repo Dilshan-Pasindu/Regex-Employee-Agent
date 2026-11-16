@@ -107,10 +107,11 @@ pub fn extract_params(prompt: &str) -> ExtractedParams {
 
 /// Extract field name and new value for update_employee operations
 fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
-    // "salary to 95000"
-    if let Some(caps) = regex::Regex::new(r"(?i)salary\s+to\s+(?P<val>[0-9]+(?:\.[0-9]+)?)")
-        .unwrap()
-        .captures(prompt)
+    // "salary to 95000" or "'s salary to 95000"
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)(?:'s\s+)?salary\s+to\s+(?P<val>[0-9]+(?:\.[0-9]+)?)")
+            .unwrap()
+            .captures(prompt)
     {
         params.field_to_update = Some("salary".to_string());
         params.new_value = caps.name("val").map(|v| v.as_str().to_string());
@@ -118,9 +119,9 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
             params.salary = params.new_value.as_ref().and_then(|v| v.parse().ok());
         }
     }
-    // "department to <name>"
+    // "department to <name or id>"
     if let Some(caps) =
-        regex::Regex::new(r"(?i)department\s+to\s+(?P<val>[A-Za-z][A-Za-z\s]*?)(?:\s*$)")
+        regex::Regex::new(r"(?i)(?:'s\s+)?department\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s]*?)(?:\s*$)")
             .unwrap()
             .captures(prompt)
     {
@@ -131,9 +132,9 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
             params.department_name = dept;
         }
     }
-    // "designation to <name>"
+    // "designation to <name or id>"
     if let Some(caps) =
-        regex::Regex::new(r"(?i)designation\s+to\s+(?P<val>[A-Za-z][A-Za-z\s\/]+?)(?:\s*$)")
+        regex::Regex::new(r"(?i)(?:'s\s+)?designation\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s\/]+?)(?:\s*$)")
             .unwrap()
             .captures(prompt)
     {
@@ -145,15 +146,42 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "status to <value>"
-    if let Some(caps) = regex::Regex::new(r"(?i)status\s+to\s+(?P<val>active|inactive|on\s+leave)")
-        .unwrap()
-        .captures(prompt)
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)(?:'s\s+)?status\s+to\s+(?P<val>active|inactive|on\s+leave)")
+            .unwrap()
+            .captures(prompt)
     {
         params.field_to_update = Some("status".to_string());
         let val = caps.name("val").map(|v| normalise_status(v.as_str()));
         params.new_value = val.clone();
         if params.status.is_none() {
             params.status = val;
+        }
+    }
+    // "email to <email>"
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)(?:'s\s+)?email\s+to\s+(?P<val>[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})")
+            .unwrap()
+            .captures(prompt)
+    {
+        params.field_to_update = Some("email".to_string());
+        let val = caps.name("val").map(|v| v.as_str().to_lowercase());
+        params.new_value = val.clone();
+        if params.email.is_none() {
+            params.email = val;
+        }
+    }
+    // "phone to <number>"
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)(?:'s\s+)?(?:phone|mobile|contact)\s+to\s+(?P<val>[0-9+\-\s]{7,20})")
+            .unwrap()
+            .captures(prompt)
+    {
+        params.field_to_update = Some("phone".to_string());
+        let val = caps.name("val").map(|v| v.as_str().trim().to_string());
+        params.new_value = val.clone();
+        if params.phone.is_none() {
+            params.phone = val;
         }
     }
 }

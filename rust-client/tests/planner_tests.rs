@@ -190,3 +190,33 @@ fn test_write_operation_confirmation_flags() {
     let plan_read = create_execution_plan(prompt_read, &ir_read);
     assert!(!plan_read.requires_confirmation);
 }
+
+#[test]
+fn test_update_employee_plan_arguments() {
+    let prompt = "Update employee 1002 salary to 95000";
+    let ir = detect_intent(prompt);
+    let plan = create_execution_plan(prompt, &ir);
+
+    assert_eq!(plan.intent_label, "update_employee");
+    assert!(plan.requires_confirmation);
+    assert!(plan.requested_fields.is_empty()); // Updates should not be projected/truncated
+
+    let tool_step = &plan.steps[1];
+    assert_eq!(tool_step.tool_name.as_deref(), Some("update_employee"));
+
+    let args = tool_step.arguments.as_ref().expect("arguments must be present");
+    assert_eq!(args.get("employeeId").and_then(|v| v.as_i64()), Some(1002));
+    assert_eq!(args.get("salary").and_then(|v| v.as_f64()), Some(95000.0));
+}
+
+#[test]
+fn test_update_employee_apostrophe_syntax() {
+    let prompt = "Update employee 1001's salary to 180000";
+    let ir = detect_intent(prompt);
+    let plan = create_execution_plan(prompt, &ir);
+
+    assert_eq!(plan.intent_label, "update_employee");
+    let args = plan.steps[1].arguments.as_ref().expect("arguments must be present");
+    assert_eq!(args.get("employeeId").and_then(|v| v.as_i64()), Some(1001));
+    assert_eq!(args.get("salary").and_then(|v| v.as_f64()), Some(180000.0));
+}
