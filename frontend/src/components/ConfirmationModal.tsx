@@ -1,6 +1,5 @@
 // =============================================================================
-// components/ConfirmationModal.tsx
-// Shown for add_employee / update_employee before the action executes.
+// components/ConfirmationModal.tsx — Write-op confirmation (redesign)
 // =============================================================================
 
 interface Props {
@@ -12,44 +11,131 @@ interface Props {
 
 export function ConfirmationModal({ intent, params, onConfirm, onCancel }: Props) {
   const label = intent === 'add_employee' ? 'Add Employee' : 'Update Employee';
+  const isAdd = intent === 'add_employee';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-800 border border-slate-600 rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-2xl">⚠️</span>
-          <h2 className="text-lg font-semibold text-slate-100">{label} — Confirm</h2>
-        </div>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        padding: 16,
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${label} confirmation`}
+    >
+      <div style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 20,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        width: '100%',
+        maxWidth: 440,
+        overflow: 'hidden',
+      }}>
+        {/* Gradient top bar */}
+        <div style={{
+          height: 4,
+          background: isAdd
+            ? 'linear-gradient(90deg,#7c3aed,#ec4899)'
+            : 'linear-gradient(90deg,#f97316,#db2777)',
+        }} />
 
-        <p className="text-sm text-slate-400 mb-4">
-          Review the extracted parameters below. Click <strong className="text-slate-200">Confirm</strong> to execute
-          this write operation on the database.
-        </p>
-
-        <div className="bg-slate-900 rounded-lg p-4 mb-5 space-y-1.5">
-          {Object.entries(params).map(([k, v]) => (
-            <div key={k} className="flex justify-between text-sm">
-              <span className="text-slate-400 font-medium">{k}</span>
-              <span className="text-slate-200 font-mono">{String(v)}</span>
+        <div style={{ padding: '24px 24px 20px' }}>
+          {/* Title */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: isAdd ? 'rgba(124,58,237,0.12)' : 'rgba(249,115,22,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20,
+            }}>
+              {isAdd ? '➕' : '✏️'}
             </div>
-          ))}
-        </div>
+            <div>
+              <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
+                {label}
+              </h2>
+              <p style={{ margin: 0, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Confirm before writing to database
+              </p>
+            </div>
+          </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={onConfirm}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold
-                       py-2 px-4 rounded-lg transition-colors text-sm"
-          >
-            ✓ Confirm
-          </button>
-          <button
-            onClick={onCancel}
-            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold
-                       py-2 px-4 rounded-lg transition-colors text-sm"
-          >
-            ✗ Cancel
-          </button>
+          {/* Body text */}
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+            Review the extracted parameters below. Click{' '}
+            <strong style={{ color: 'var(--text)' }}>Confirm</strong> to execute
+            this write operation.
+          </p>
+
+          {/* Params card */}
+          <div style={{
+            background: 'var(--surface-2)',
+            border: '1px solid var(--border)',
+            borderRadius: 12,
+            padding: '12px 16px',
+            marginBottom: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}>
+            {Object.entries(params).map(([k, v]) => (
+              <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.82rem' }}>
+                <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>{k}</span>
+                <span style={{ color: 'var(--text)', fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                  {String(v)}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              onClick={onConfirm}
+              style={{
+                flex: 1,
+                background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                border: 'none',
+                color: '#fff',
+                borderRadius: 12,
+                padding: '10px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                fontFamily: 'var(--font-body)',
+                cursor: 'pointer',
+                transition: 'opacity 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              ✓ Confirm
+            </button>
+            <button
+              onClick={onCancel}
+              style={{
+                flex: 1,
+                background: 'var(--surface-2)',
+                border: '1.5px solid var(--border)',
+                color: 'var(--text)',
+                borderRadius: 12,
+                padding: '10px',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                fontFamily: 'var(--font-body)',
+                cursor: 'pointer',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+            >
+              ✗ Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

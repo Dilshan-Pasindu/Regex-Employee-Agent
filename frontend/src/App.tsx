@@ -1,21 +1,9 @@
 // =============================================================================
-// App.tsx — Root application shell
-//
-// Layout:
-//   ┌──────────────────────────────────┐
-//   │  Header (title, health, tools)   │
-//   ├──────────────────────────────────┤
-//   │                                  │
-//   │       ChatPanel (messages)       │
-//   │                                  │
-//   ├──────────────────────────────────┤
-//   │  Input bar + send button         │
-//   └──────────────────────────────────┘
-//   [ConfirmationModal overlay]
-//   [ToolCatalogDrawer sidebar]
+// App.tsx — Root application shell (vibrant redesign)
+// All existing logic preserved; only UI layer changed.
 // =============================================================================
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { ChatPanel } from './components/ChatPanel';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { ToolCatalogDrawer } from './components/ToolCatalogDrawer';
@@ -34,7 +22,13 @@ export default function App() {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync dark-mode token on <html>
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }, [isDark]);
 
   const addMessage = useCallback((msg: ChatMessage) => {
     setMessages(prev => [...prev, msg]);
@@ -56,7 +50,6 @@ export default function App() {
   async function submit(prompt: string, confirmed = false) {
     if (!prompt.trim() || loading) return;
 
-    // Add user bubble
     addMessage({
       id: nanoid(),
       role: 'user',
@@ -64,7 +57,6 @@ export default function App() {
       timestamp: new Date(),
     });
 
-    // Add pending agent bubble
     const agentId = nanoid();
     addMessage({
       id: agentId,
@@ -78,10 +70,8 @@ export default function App() {
     try {
       const resp = await sendChat(prompt.trim(), confirmed, sessionId);
 
-      // Persist session
       if (!sessionId) setSessionId(resp.session_id);
 
-      // Write ops needing confirmation
       if (resp.requires_confirmation) {
         setConfirmation({
           prompt: prompt.trim(),
@@ -98,15 +88,8 @@ export default function App() {
         return;
       }
 
-      const content = resp.message
-        ?? (resp.success ? 'Done.' : 'Something went wrong.');
-
-      updateLastAgentMessage({
-        id: agentId,
-        content,
-        pending: false,
-        response: resp,
-      });
+      const content = resp.message ?? (resp.success ? 'Done.' : 'Something went wrong.');
+      updateLastAgentMessage({ id: agentId, content, pending: false, response: resp });
     } catch (err) {
       updateLastAgentMessage({
         id: agentId,
@@ -149,58 +132,160 @@ export default function App() {
     });
   }
 
+  const headerGrad = 'linear-gradient(135deg, #7c3aed 0%, #db2777 55%, #f97316 100%)';
+
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-slate-200">
-      {/* ------------------------------------------------------------------ */}
-      {/* Header */}
-      {/* ------------------------------------------------------------------ */}
-      <header className="shrink-0 flex items-center justify-between px-4 py-3
-                         border-b border-slate-700 bg-slate-900/90 backdrop-blur">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🤖</span>
+    <div
+      style={{ background: 'var(--bg)', color: 'var(--text)' }}
+      className="flex flex-col h-screen"
+    >
+      {/* ---- Header --------------------------------------------------- */}
+      <header
+        style={{ background: headerGrad }}
+        className="shrink-0 flex items-center justify-between px-4 py-3 shadow-lg"
+        role="banner"
+      >
+        {/* Left: avatar + title */}
+        <div className="flex items-center gap-3">
+          <div style={{
+            width: 42, height: 42,
+            background: 'rgba(255,255,255,0.2)',
+            borderRadius: 14,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 22,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+          }}>
+            🤖
+          </div>
           <div>
-            <h1 className="text-sm font-semibold text-slate-100 leading-tight">
-              Employee Management Agent
+            <h1 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff', lineHeight: 1.2, margin: 0 }}>
+              Employee Agent
             </h1>
-            <p className="text-xs text-slate-500">
-              MCP · .NET · Rust · FastAPI · MySQL · <span className="text-emerald-400">No LLM</span>
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 2 }}>
+              {/* Online dot */}
+              <span style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: '#4ade80',
+                boxShadow: '0 0 0 2px rgba(74,222,128,0.4)',
+                animation: 'pulseGlow 2s infinite',
+                display: 'inline-block',
+              }} />
+              <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
+                Online · No LLM · Rust Regex
+              </span>
+            </div>
           </div>
         </div>
 
+        {/* Right: session id + dark toggle + tools + clear */}
         <div className="flex gap-2 items-center">
           {sessionId && (
-            <span className="hidden sm:block text-xs text-slate-600 font-mono truncate max-w-[140px]">
+            <span style={{
+              fontSize: '0.65rem',
+              color: 'rgba(255,255,255,0.6)',
+              fontFamily: 'monospace',
+              maxWidth: 100,
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+              className="hidden sm:block"
+            >
               {sessionId.slice(0, 8)}…
             </span>
           )}
+
+          {/* Dark mode toggle */}
+          <button
+            onClick={() => setIsDark(d => !d)}
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: 10,
+              padding: '5px 10px',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.3)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.18)')}
+          >
+            {isDark ? '☀️' : '🌙'}
+          </button>
+
           <button
             onClick={() => setDrawerOpen(o => !o)}
-            className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600
-                       text-slate-300 px-3 py-1.5 rounded-lg transition-colors"
+            aria-label="Open MCP tool catalogue"
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: 10,
+              padding: '5px 10px',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.3)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.18)')}
           >
             🔧 Tools
           </button>
+
           <button
             onClick={() => { setMessages([]); setSessionId(undefined); }}
-            className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-600
-                       text-slate-300 px-3 py-1.5 rounded-lg transition-colors"
+            aria-label="Clear chat history"
+            style={{
+              background: 'rgba(255,255,255,0.18)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: 10,
+              padding: '5px 10px',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.3)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.18)')}
           >
             🗑 Clear
           </button>
         </div>
       </header>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Chat panel */}
-      {/* ------------------------------------------------------------------ */}
-      <ChatPanel messages={messages} />
+      {/* ---- Chat panel ----------------------------------------------- */}
+      <ChatPanel messages={messages} onChipClick={(text) => { submit(text); }} />
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Input bar */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="shrink-0 border-t border-slate-700 bg-slate-900/90 backdrop-blur px-4 py-3">
-        <div className="flex gap-2 max-w-4xl mx-auto">
+      {/* ---- Input bar ------------------------------------------------ */}
+      <div
+        style={{
+          background: 'var(--surface)',
+          borderTop: '1px solid var(--border)',
+          padding: '12px 16px 14px',
+        }}
+        className="shrink-0"
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: 10,
+            maxWidth: 860,
+            margin: '0 auto',
+            background: 'var(--surface-2)',
+            borderRadius: 20,
+            padding: '6px 6px 6px 16px',
+            border: '1.5px solid var(--border)',
+            boxShadow: '0 2px 20px rgba(124,58,237,0.08)',
+            transition: 'box-shadow 0.2s',
+          }}
+          onFocusCapture={e => (e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124,58,237,0.25)')}
+          onBlurCapture={e => (e.currentTarget.style.boxShadow = '0 2px 20px rgba(124,58,237,0.08)')}
+        >
           <input
             ref={inputRef}
             type="text"
@@ -209,28 +294,47 @@ export default function App() {
             onKeyDown={handleKeyDown}
             disabled={loading}
             placeholder="e.g. Show all employees · Find employee 1001 · Add employee…"
-            className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-4 py-2.5
-                       text-sm text-slate-100 placeholder-slate-500 outline-none
-                       focus:border-sky-500 transition-colors disabled:opacity-50"
+            aria-label="Chat input"
+            style={{
+              flex: 1,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              color: 'var(--text)',
+              fontSize: '0.9rem',
+              fontFamily: 'var(--font-body)',
+              opacity: loading ? 0.5 : 1,
+            }}
           />
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}
-            className="bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed
-                       text-white font-semibold px-4 py-2.5 rounded-xl transition-colors text-sm
-                       shrink-0"
+            aria-label="Send message"
+            style={{
+              background: loading || !input.trim()
+                ? 'rgba(124,58,237,0.3)'
+                : 'linear-gradient(135deg, #7c3aed, #db2777)',
+              border: 'none',
+              color: '#fff',
+              borderRadius: 14,
+              padding: '8px 20px',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              fontFamily: 'var(--font-body)',
+              cursor: loading || !input.trim() ? 'not-allowed' : 'pointer',
+              transition: 'all 0.2s',
+              whiteSpace: 'nowrap',
+            }}
           >
-            {loading ? '…' : 'Send'}
+            {loading ? '…' : 'Send ↑'}
           </button>
         </div>
-        <p className="text-center text-xs text-slate-700 mt-1.5">
+        <p style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 6 }}>
           Deterministic Rust Regex intent detection · Zero AI/LLM
         </p>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* Overlays */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---- Overlays ------------------------------------------------- */}
       {confirmation && (
         <ConfirmationModal
           intent={confirmation.intent}

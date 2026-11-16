@@ -1,69 +1,110 @@
 // =============================================================================
-// components/ChatPanel.tsx — Main chat message timeline
+// components/ChatPanel.tsx — Animated chat timeline (vibrant redesign)
 // =============================================================================
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import type { ChatMessage } from '../types';
 import { StepTracePanel } from './StepTrace';
 import { EmployeeTable } from './EmployeeTable';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
+// ---------- Intent badge --------------------------------------------------
 function IntentBadge({ intent }: { intent: string }) {
-  const colour = intent.startsWith('add') || intent.startsWith('update')
-    ? 'bg-amber-900 text-amber-300 border border-amber-700'
-    : 'bg-sky-900 text-sky-300 border border-sky-700';
+  const isWrite = intent.startsWith('add') || intent.startsWith('update');
   return (
-    <span className={`inline-block text-xs px-2 py-0.5 rounded font-mono ${colour}`}>
+    <span style={{
+      display: 'inline-block',
+      fontSize: '0.68rem',
+      fontWeight: 700,
+      fontFamily: 'monospace',
+      padding: '1px 8px',
+      borderRadius: 99,
+      background: isWrite ? 'rgba(245,158,11,0.15)' : 'rgba(124,58,237,0.15)',
+      color: isWrite ? '#d97706' : '#7c3aed',
+      border: `1px solid ${isWrite ? 'rgba(245,158,11,0.3)' : 'rgba(124,58,237,0.3)'}`,
+    }}>
       {intent}
     </span>
   );
 }
 
+// ---------- Typing indicator ----------------------------------------------
+function TypingIndicator() {
+  return (
+    <div className="flex gap-3 items-start msg-enter">
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+        background: 'linear-gradient(135deg,#7c3aed,#db2777)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, marginTop: 2,
+      }}>🤖</div>
+      <div style={{
+        background: 'var(--bot-bubble)',
+        color: 'var(--bot-text)',
+        borderRadius: '18px 18px 18px 4px',
+        padding: '12px 16px',
+        display: 'flex', alignItems: 'center', gap: 4,
+      }}>
+        <div className="dot-bounce" aria-label="Thinking">
+          <span /><span /><span />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Agent bubble --------------------------------------------------
 function AgentBubble({ msg }: { msg: ChatMessage }) {
   const r = msg.response;
 
-  if (msg.pending) {
-    return (
-      <div className="flex gap-3 items-start">
-        <span className="mt-1 shrink-0 text-lg">🤖</span>
-        <div className="bg-slate-800 rounded-xl rounded-tl-sm px-4 py-3 text-slate-300 text-sm max-w-2xl">
-          <span className="animate-pulse">Thinking…</span>
-        </div>
-      </div>
-    );
-  }
+  if (msg.pending) return <TypingIndicator />;
 
   return (
-    <div className="flex gap-3 items-start">
-      <span className="mt-1 shrink-0 text-lg">🤖</span>
-      <div className="bg-slate-800 border border-slate-700 rounded-xl rounded-tl-sm
-                      px-4 py-3 text-slate-200 text-sm max-w-2xl w-full">
+    <div className="flex gap-3 items-start msg-enter">
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+        background: 'linear-gradient(135deg,#7c3aed,#db2777)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16, marginTop: 2,
+      }}>🤖</div>
 
+      <div style={{
+        background: 'var(--bot-bubble)',
+        color: 'var(--bot-text)',
+        borderRadius: '18px 18px 18px 4px',
+        padding: '12px 16px',
+        maxWidth: 680,
+        width: '100%',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+      }}>
         {/* Intent badge */}
         {r?.intent && r.intent !== 'unknown' && (
-          <div className="mb-2">
+          <div style={{ marginBottom: 8 }}>
             <IntentBadge intent={r.intent} />
             {r.tool && (
-              <span className="ml-2 text-xs text-slate-500">→ {r.tool}</span>
+              <span style={{ marginLeft: 8, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                → {r.tool}
+              </span>
             )}
           </div>
         )}
 
         {/* Main message */}
-        <p className={`mb-1 ${r?.success === false ? 'text-red-400' : 'text-slate-100'}`}>
-          {msg.content}
-        </p>
+        <div style={{ color: r?.success === false ? '#ef4444' : 'var(--bot-text)' }}>
+          <MarkdownRenderer content={msg.content} />
+        </div>
 
-        {/* Result table / JSON */}
+        {/* Result table */}
         {r?.result !== undefined && r?.result !== null && (
           <EmployeeTable data={r.result} />
         )}
 
-        {/* Step trace accordion */}
+        {/* Step trace */}
         {r?.steps && r.steps.length > 0 && (
           <StepTracePanel steps={r.steps} />
         )}
 
-        <div className="mt-2 text-xs text-slate-600">
+        <div style={{ marginTop: 6, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
           {msg.timestamp.toLocaleTimeString()}
         </div>
       </div>
@@ -71,68 +112,226 @@ function AgentBubble({ msg }: { msg: ChatMessage }) {
   );
 }
 
+// ---------- User bubble ---------------------------------------------------
 function UserBubble({ msg }: { msg: ChatMessage }) {
   return (
-    <div className="flex gap-3 items-start justify-end">
-      <div className="bg-sky-700 text-white rounded-xl rounded-tr-sm px-4 py-3
-                      text-sm max-w-xl">
+    <div className="flex gap-3 items-end justify-end msg-enter">
+      <div style={{
+        background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+        color: '#fff',
+        borderRadius: '18px 18px 4px 18px',
+        padding: '10px 16px',
+        maxWidth: 520,
+        fontSize: '0.875rem',
+        boxShadow: '0 2px 12px rgba(124,58,237,0.3)',
+        lineHeight: 1.5,
+      }}>
         {msg.content}
-        <div className="mt-1 text-xs text-sky-300/70">
+        <div style={{ marginTop: 4, fontSize: '0.65rem', color: 'rgba(255,255,255,0.65)', textAlign: 'right' }}>
           {msg.timestamp.toLocaleTimeString()}
         </div>
       </div>
-      <span className="mt-1 shrink-0 text-lg">🧑‍💻</span>
+      <div style={{
+        width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+        background: 'rgba(124,58,237,0.15)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 16,
+      }}>🧑‍💻</div>
     </div>
   );
 }
 
-interface Props {
-  messages: ChatMessage[];
+// ---------- Suggestion chips (welcome screen) -----------------------------
+const CHIPS = [
+  { label: '👥 All employees',   text: 'Show all employees' },
+  { label: '🔍 Find #1001',      text: 'Find employee 1001' },
+  { label: '🏢 IT department',   text: 'Search employees in IT' },
+  { label: '📊 All departments', text: 'Show all departments' },
+];
+
+function WelcomeScreen({ onChip }: { onChip: (text: string) => void }) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      padding: '24px 16px', userSelect: 'none',
+      gap: 20,
+    }}>
+      {/* Avatar */}
+      <div style={{
+        width: 80, height: 80, borderRadius: 24,
+        background: 'linear-gradient(135deg,#7c3aed,#db2777,#f97316)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 40,
+        boxShadow: '0 8px 32px rgba(124,58,237,0.35)',
+      }}>🤖</div>
+
+      {/* Greeting */}
+      <div style={{ textAlign: 'center' }}>
+        <h2 className="grad-text" style={{ fontSize: '1.4rem', fontWeight: 800, margin: '0 0 6px' }}>
+          Employee Management Agent
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
+          Ask me anything about your employees — no AI involved!
+        </p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 4 }}>
+          Powered by deterministic <strong>Rust Regex</strong> · .NET MCP · FastAPI · MySQL
+        </p>
+      </div>
+
+      {/* Chips */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', maxWidth: 480 }}>
+        {CHIPS.map(chip => (
+          <button
+            key={chip.text}
+            onClick={() => onChip(chip.text)}
+            style={{
+              background: 'var(--surface)',
+              border: '1.5px solid var(--border)',
+              color: 'var(--text)',
+              borderRadius: 99,
+              padding: '8px 18px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+              transition: 'all 0.18s',
+              boxShadow: '0 1px 6px rgba(124,58,237,0.08)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = 'linear-gradient(135deg,#7c3aed,#ec4899)';
+              e.currentTarget.style.color = '#fff';
+              e.currentTarget.style.borderColor = 'transparent';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(124,58,237,0.35)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = 'var(--surface)';
+              e.currentTarget.style.color = 'var(--text)';
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.boxShadow = '0 1px 6px rgba(124,58,237,0.08)';
+            }}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Hint grid */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(2,1fr)',
+        gap: 8, maxWidth: 480, width: '100%',
+      }}>
+        {[
+          'Add employee Jane Doe email j@co.com dept IT designation Engineer',
+          'Update employee 1001 status to Inactive',
+          'Update employee 1002 salary to 95000',
+          'Count active employees',
+        ].map(hint => (
+          <div
+            key={hint}
+            style={{
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '7px 10px',
+              fontSize: '0.7rem',
+              color: 'var(--text-muted)',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+              transition: 'border-color 0.15s',
+            }}
+            onClick={() => onChip(hint)}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+          >
+            {hint}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-export function ChatPanel({ messages }: Props) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+// ---------- ChatPanel (main export) ---------------------------------------
+interface Props {
+  messages: ChatMessage[];
+  onChipClick: (text: string) => void;
+}
 
+export function ChatPanel({ messages, onChipClick }: Props) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  // Auto-scroll to bottom on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Show "scroll to bottom" FAB when user scrolls up
+  function handleScroll() {
+    const el = scrollRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setShowScrollBtn(!nearBottom);
+  }
+
+  function scrollToBottom() {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }
+
   if (messages.length === 0) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-500 select-none">
-        <span className="text-5xl">🤖</span>
-        <div className="text-center">
-          <p className="font-semibold text-slate-300 text-lg">Employee Management Agent</p>
-          <p className="text-sm mt-1">Ask me anything about your employees</p>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-left max-w-sm">
-            {[
-              'Show all employees',
-              'Find employee 1001',
-              'Search employees in IT',
-              'Count active employees',
-              'Show all departments',
-              'Add employee Jane Doe email j.doe@co.com dept IT designation Engineer',
-              'Update employee 1001 status to Inactive',
-              'Update employee 1002 salary to 95000',
-            ].map(hint => (
-              <div key={hint} className="bg-slate-800 rounded px-2 py-1.5 text-slate-400 font-mono">
-                {hint}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
+    return <WelcomeScreen onChip={onChipClick} />;
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-      {messages.map(msg =>
-        msg.role === 'user'
-          ? <UserBubble key={msg.id} msg={msg} />
-          : <AgentBubble key={msg.id} msg={msg} />
+    <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        style={{
+          height: '100%',
+          overflowY: 'auto',
+          padding: '20px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 14,
+        }}
+      >
+        {messages.map(msg =>
+          msg.role === 'user'
+            ? <UserBubble key={msg.id} msg={msg} />
+            : <AgentBubble key={msg.id} msg={msg} />
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Scroll-to-bottom button */}
+      {showScrollBtn && (
+        <button
+          onClick={scrollToBottom}
+          aria-label="Scroll to latest message"
+          style={{
+            position: 'absolute',
+            bottom: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'linear-gradient(135deg,#7c3aed,#db2777)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 99,
+            padding: '6px 18px',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            fontFamily: 'var(--font-body)',
+            cursor: 'pointer',
+            boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
+            transition: 'opacity 0.2s',
+          }}
+        >
+          ↓ Latest
+        </button>
       )}
-      <div ref={bottomRef} />
     </div>
   );
 }

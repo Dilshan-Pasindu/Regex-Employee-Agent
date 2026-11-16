@@ -1,5 +1,5 @@
 // =============================================================================
-// components/ToolCatalogDrawer.tsx — Sidebar showing discovered MCP tools
+// components/ToolCatalogDrawer.tsx — MCP tool sidebar (redesign)
 // =============================================================================
 
 import { useEffect, useState } from 'react';
@@ -32,54 +32,149 @@ export function ToolCatalogDrawer({ open, onClose }: Props) {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-30 bg-black/40"
+        style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
+
       {/* Drawer */}
-      <aside className="fixed right-0 top-0 z-40 h-full w-80 bg-slate-900 border-l border-slate-700
-                        flex flex-col shadow-2xl overflow-y-auto">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 sticky top-0 bg-slate-900">
-          <h2 className="text-sm font-semibold text-slate-100">🔧 MCP Tool Catalogue</h2>
+      <aside
+        style={{
+          position: 'fixed', right: 0, top: 0, zIndex: 40,
+          height: '100%', width: 300,
+          background: 'var(--surface)',
+          borderLeft: '1px solid var(--border)',
+          display: 'flex', flexDirection: 'column',
+          boxShadow: '-8px 0 32px rgba(0,0,0,0.15)',
+          overflowY: 'auto',
+        }}
+        role="complementary"
+        aria-label="MCP Tool Catalogue"
+      >
+        {/* Header */}
+        <div style={{
+          padding: '14px 16px',
+          borderBottom: '1px solid var(--border)',
+          position: 'sticky', top: 0,
+          background: 'var(--surface)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              width: 30, height: 30, borderRadius: 8,
+              background: 'linear-gradient(135deg,#7c3aed,#db2777)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 15,
+            }}>🔧</span>
+            <h2 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)' }}>
+              MCP Tool Catalogue
+            </h2>
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-100 text-lg leading-none"
+            aria-label="Close drawer"
+            style={{
+              background: 'none', border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '1.1rem', cursor: 'pointer',
+              padding: '2px 6px', borderRadius: 6,
+              transition: 'color 0.15s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
+            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
             ✕
           </button>
         </div>
 
-        <div className="flex-1 p-3 space-y-2">
+        {/* Body */}
+        <div style={{ flex: 1, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {loading && (
-            <p className="text-slate-400 text-xs text-center py-8">Loading tools…</p>
+            <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+              <div className="dot-bounce" style={{ justifyContent: 'center', display: 'flex', gap: 4 }}>
+                <span /><span /><span />
+              </div>
+              <p style={{ marginTop: 8 }}>Loading tools…</p>
+            </div>
           )}
           {error && (
-            <p className="text-red-400 text-xs">{error}</p>
+            <p style={{ color: '#ef4444', fontSize: '0.78rem', padding: '8px 4px' }}>
+              ⚠ {error}
+            </p>
           )}
+
           {tools.map(tool => (
-            <div key={tool.name} className="rounded-lg border border-slate-700 overflow-hidden">
+            <div
+              key={tool.name}
+              style={{
+                borderRadius: 12,
+                border: '1px solid var(--border)',
+                overflow: 'hidden',
+                transition: 'border-color 0.15s',
+              }}
+              onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.borderColor = '#7c3aed')}
+              onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.borderColor = 'var(--border)')}
+            >
+              {/* Tool header button */}
               <button
-                className="w-full flex justify-between items-center px-3 py-2 text-left
-                           text-xs hover:bg-slate-800 transition-colors"
+                style={{
+                  width: '100%',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 12px',
+                  background: 'none', border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.12s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 onClick={() => setExpanded(e => e === tool.name ? null : tool.name)}
+                aria-expanded={expanded === tool.name}
               >
-                <span className="font-mono text-sky-400 font-medium">{tool.name}</span>
-                <span className="text-slate-500">{expanded === tool.name ? '▲' : '▼'}</span>
+                {/* Left: coloured bar + name */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    width: 3, height: 20, borderRadius: 2,
+                    background: 'linear-gradient(180deg,#7c3aed,#ec4899)',
+                    flexShrink: 0,
+                  }} />
+                  <span style={{
+                    fontFamily: 'monospace', fontSize: '0.78rem',
+                    fontWeight: 700, color: '#7c3aed',
+                  }}>
+                    {tool.name}
+                  </span>
+                </div>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', transition: 'transform 0.15s',
+                  transform: expanded === tool.name ? 'rotate(180deg)' : 'rotate(0deg)',
+                  display: 'inline-block',
+                }}>▼</span>
               </button>
 
+              {/* Expanded content */}
               {expanded === tool.name && (
-                <div className="px-3 pb-3 bg-slate-800/50 text-xs space-y-2">
+                <div style={{
+                  padding: '10px 12px 12px',
+                  background: 'var(--surface-2)',
+                  borderTop: '1px solid var(--border)',
+                  fontSize: '0.76rem',
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                }}>
                   {tool.description && (
-                    <p className="text-slate-300 mt-1">{tool.description}</p>
+                    <p style={{ margin: 0, color: 'var(--text)', lineHeight: 1.5 }}>
+                      {tool.description}
+                    </p>
                   )}
                   {tool.inputSchema?.properties && (
                     <div>
-                      <p className="text-slate-500 font-medium mb-1">Parameters:</p>
+                      <p style={{ margin: '0 0 4px', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.65rem', letterSpacing: 1 }}>
+                        Parameters
+                      </p>
                       {Object.entries(tool.inputSchema.properties).map(([pname, pschema]) => (
-                        <div key={pname} className="flex gap-1 text-slate-400">
-                          <span className="text-sky-500 font-mono">{pname}</span>
-                          <span className="text-slate-600">({pschema.type ?? 'any'})</span>
+                        <div key={pname} style={{ display: 'flex', gap: 4, alignItems: 'baseline', marginBottom: 2 }}>
+                          <span style={{ color: '#7c3aed', fontFamily: 'monospace', fontWeight: 700 }}>{pname}</span>
+                          <span style={{ color: 'var(--text-muted)' }}>({pschema.type ?? 'any'})</span>
                           {tool.inputSchema?.required?.includes(pname) && (
-                            <span className="text-red-400">*</span>
+                            <span style={{ color: '#ef4444', fontWeight: 700 }}>*</span>
                           )}
                         </div>
                       ))}

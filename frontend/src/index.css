@@ -1,23 +1,153 @@
+/* ============================================================
+   index.css — Global styles & CSS theme tokens
+   Palette: violet → pink → orange (light + dark)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+/* ---- Theme tokens ----------------------------------------- */
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  color-scheme: dark;
+  --font-body: 'Nunito', system-ui, sans-serif;
+
+  /* Surfaces */
+  --bg:          #f5f3ff;
+  --surface:     #ffffff;
+  --surface-2:   #ede9fe;
+  --border:      #ddd6fe;
+
+  /* Text */
+  --text:        #1e1040;
+  --text-muted:  #7c6fa0;
+
+  /* Gradient stops */
+  --g-from:  #7c3aed;   /* violet-600 */
+  --g-mid:   #db2777;   /* pink-600   */
+  --g-to:    #f97316;   /* orange-500 */
+
+  /* Bubbles */
+  --user-bubble-from: #7c3aed;
+  --user-bubble-to:   #ec4899;
+  --bot-bubble:       #ede9fe;
+  --bot-text:         #1e1040;
+
+  /* Status colours */
+  --status-active:   #10b981;
+  --status-inactive: #ef4444;
+  --status-leave:    #f59e0b;
+
+  /* Scroll-to-bottom fab */
+  --fab-bg: #7c3aed;
+  --fab-hover: #6d28d9;
 }
 
-* {
-  box-sizing: border-box;
+[data-theme="dark"] {
+  --bg:          #0d0820;
+  --surface:     #160d2e;
+  --surface-2:   #1f1245;
+  --border:      #2d1b6e;
+  --text:        #ede9fe;
+  --text-muted:  #9b89c4;
+  --bot-bubble:  #1f1245;
+  --bot-text:    #ede9fe;
+  --fab-bg:      #7c3aed;
+  --fab-hover:   #8b5cf6;
 }
 
-body {
+/* ---- Base -------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
   margin: 0;
-  background-color: #0f172a; /* slate-900 */
-  color: #e2e8f0;             /* slate-200 */
-  min-height: 100vh;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+#root { height: 100%; display: flex; flex-direction: column; }
+
+/* ---- Scrollbar -------------------------------------------- */
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--g-from); }
+
+/* ---- Gradient utility ------------------------------------- */
+.grad-text {
+  background: linear-gradient(90deg, var(--g-from), var(--g-mid), var(--g-to));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ---- Message animations ----------------------------------- */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes bounce3 {
+  0%, 80%, 100% { transform: translateY(0); }
+  40%           { transform: translateY(-6px); }
+}
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,.4); }
+  50%       { box-shadow: 0 0 0 6px rgba(124,58,237,0); }
+}
+
+.msg-enter {
+  animation: slideUp 0.25s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .msg-enter { animation: none; }
+}
+
+/* Typing dots */
+.dot-bounce span {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--g-from);
+  animation: bounce3 1.3s infinite;
+}
+.dot-bounce span:nth-child(2) { animation-delay: 0.15s; background: var(--g-mid); }
+.dot-bounce span:nth-child(3) { animation-delay: 0.30s; background: var(--g-to);  }
+
+/* ---- Focus ring override ---------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--g-from);
+  outline-offset: 2px;
+}
+
+/* ---- Code blocks inside markdown -------------------------- */
+.md-code-block {
+  position: relative;
+}
+.md-code-block pre {
+  background: #0f0820;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  margin: 0.5rem 0;
+}
+[data-theme="dark"] .md-code-block pre {
+  background: #060310;
+}
+.copy-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  background: rgba(124,58,237,0.7);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.copy-btn:hover { background: var(--g-from); }

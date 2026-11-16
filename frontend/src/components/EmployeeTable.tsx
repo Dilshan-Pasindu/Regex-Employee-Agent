@@ -1,16 +1,19 @@
 // =============================================================================
-// components/EmployeeTable.tsx — Sortable table with status badges
+// components/EmployeeTable.tsx — Sortable table with status badges (redesign)
 // =============================================================================
 
 import { useState } from 'react';
 
 type Row = Record<string, unknown>;
 
-const STATUS_BADGE: Record<string, string> = {
-  Active:    'bg-emerald-900 text-emerald-300 border border-emerald-700',
-  Inactive:  'bg-red-900 text-red-300 border border-red-700',
-  'On Leave': 'bg-yellow-900 text-yellow-300 border border-yellow-700',
-};
+function statusStyle(val: string): React.CSSProperties {
+  switch (val) {
+    case 'Active':    return { background: 'rgba(16,185,129,0.15)', color: '#059669', border: '1px solid rgba(16,185,129,0.3)' };
+    case 'Inactive':  return { background: 'rgba(239,68,68,0.12)',  color: '#dc2626', border: '1px solid rgba(239,68,68,0.25)' };
+    case 'On Leave':  return { background: 'rgba(245,158,11,0.15)', color: '#d97706', border: '1px solid rgba(245,158,11,0.3)' };
+    default:          return { background: 'rgba(124,58,237,0.1)',  color: '#7c3aed', border: '1px solid rgba(124,58,237,0.2)' };
+  }
+}
 
 interface Props {
   data: unknown;
@@ -20,7 +23,6 @@ export function EmployeeTable({ data }: Props) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [asc, setAsc] = useState(true);
 
-  // Normalise to array
   const rows: Row[] = Array.isArray(data)
     ? (data as Row[])
     : data && typeof data === 'object'
@@ -40,41 +42,62 @@ export function EmployeeTable({ data }: Props) {
     : rows;
 
   function handleSort(key: string) {
-    if (key === sortKey) {
-      setAsc(a => !a);
-    } else {
-      setSortKey(key);
-      setAsc(true);
-    }
+    if (key === sortKey) setAsc(a => !a);
+    else { setSortKey(key); setAsc(true); }
   }
 
   function renderCell(key: string, val: unknown) {
     if (key === 'status' && typeof val === 'string') {
-      const cls = STATUS_BADGE[val] ?? 'bg-slate-700 text-slate-300';
       return (
-        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>
+        <span style={{
+          display: 'inline-block',
+          fontSize: '0.68rem',
+          fontWeight: 700,
+          padding: '2px 8px',
+          borderRadius: 99,
+          ...statusStyle(val),
+        }}>
           {val}
         </span>
       );
     }
-    if (val === null || val === undefined) return <span className="text-slate-500">—</span>;
+    if (val === null || val === undefined) {
+      return <span style={{ color: 'var(--text-muted)' }}>—</span>;
+    }
     return <span>{String(val)}</span>;
   }
 
   return (
-    <div className="overflow-x-auto mt-2 rounded-lg border border-slate-700">
-      <table className="text-xs w-full border-collapse">
+    <div style={{
+      overflowX: 'auto',
+      marginTop: 10,
+      borderRadius: 12,
+      border: '1px solid var(--border)',
+      boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+    }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
         <thead>
-          <tr className="bg-slate-800 text-slate-400">
+          <tr style={{
+            background: 'linear-gradient(90deg, rgba(124,58,237,0.12), rgba(219,39,119,0.08))',
+          }}>
             {keys.map(k => (
               <th
                 key={k}
-                className="px-3 py-2 text-left cursor-pointer select-none hover:text-slate-200 whitespace-nowrap"
                 onClick={() => handleSort(k)}
+                style={{
+                  padding: '8px 12px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  fontWeight: 700,
+                  color: sortKey === k ? '#7c3aed' : 'var(--text-muted)',
+                  userSelect: 'none',
+                  transition: 'color 0.15s',
+                }}
               >
                 {k}
                 {sortKey === k && (
-                  <span className="ml-1">{asc ? '↑' : '↓'}</span>
+                  <span style={{ marginLeft: 4 }}>{asc ? '↑' : '↓'}</span>
                 )}
               </th>
             ))}
@@ -84,10 +107,15 @@ export function EmployeeTable({ data }: Props) {
           {sorted.map((row, i) => (
             <tr
               key={i}
-              className="border-t border-slate-700 hover:bg-slate-800/60 transition-colors"
+              style={{
+                borderTop: '1px solid var(--border)',
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(124,58,237,0.04)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
               {keys.map(k => (
-                <td key={k} className="px-3 py-2 text-slate-200 whitespace-nowrap">
+                <td key={k} style={{ padding: '7px 12px', whiteSpace: 'nowrap', color: 'var(--text)' }}>
                   {renderCell(k, row[k])}
                 </td>
               ))}
@@ -95,7 +123,12 @@ export function EmployeeTable({ data }: Props) {
           ))}
         </tbody>
       </table>
-      <div className="px-3 py-1.5 text-xs text-slate-500 border-t border-slate-700">
+      <div style={{
+        padding: '5px 12px',
+        fontSize: '0.68rem',
+        color: 'var(--text-muted)',
+        borderTop: '1px solid var(--border)',
+      }}>
         {rows.length} row{rows.length !== 1 ? 's' : ''}
       </div>
     </div>
