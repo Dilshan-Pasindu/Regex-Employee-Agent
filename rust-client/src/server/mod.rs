@@ -321,7 +321,7 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
         GetEmployeeCount => {
             let mut args = serde_json::Map::new();
             if let Some(ref d) = p.department_name {
-                args.insert("departmentName".into(), json!(d));
+                args.insert("department".into(), json!(d));
             }
             if let Some(ref s) = p.status {
                 args.insert("status".into(), json!(s));

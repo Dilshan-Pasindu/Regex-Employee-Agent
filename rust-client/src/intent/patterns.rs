@@ -92,17 +92,24 @@ pub static RE_GET_DEPARTMENTS: Lazy<Vec<Regex>> = Lazy::new(|| {
 // get_employee_count patterns
 // ---------------------------------------------------------------------------
 pub static RE_GET_COUNT: Lazy<Vec<Regex>> = Lazy::new(|| {
-    let v = &Vocabulary::get().intents.get_employee_count;
+    let vocab = Vocabulary::get();
+    let v = &vocab.intents.get_employee_count;
     let triggers = Vocabulary::alternation(&v.count_triggers);
     let targets = Vocabulary::alternation(&v.targets);
     let standalone = Vocabulary::alternation(&v.standalone_phrases);
+    let statuses = Vocabulary::alternation(&vocab.intents.search_employees.statuses);
 
     vec![
-        Regex::new(&format!(r"(?i)({triggers})\s+({targets})")).unwrap(),
+        // "count active employees", "how many on leave staff", "count employees"
+        Regex::new(&format!(r"(?i)({triggers})\s+(?:all\s+)?(?:({statuses})\s+)?({targets})")).unwrap(),
+        // "count employees who are active", "how many employees are active"
+        Regex::new(&format!(r"(?i)({triggers})\s+({targets})\s+(?:who\s+are\s+|that\s+are\s+|are\s+|with\s+status\s+)?({statuses})")).unwrap(),
+        // "active employee count"
+        Regex::new(&format!(r"(?i)^({statuses})\s+({standalone})$")).unwrap(),
         Regex::new(&format!(r"(?i)^({standalone})$")).unwrap(),
         Regex::new(r"(?i)total\s+(number\s+of\s+)?employees?").unwrap(),
-        Regex::new(r"(?i)count\s+employees?\s+(in|from|of)\s+(?P<dept>[A-Za-z][A-Za-z\s]*?)(\s+department)?$").unwrap(),
-        Regex::new(r"(?i)how\s+many\s+employees?\s+(are\s+)?(in|from|of)\s+(?P<dept>[A-Za-z][A-Za-z\s]*?)(\s+department)?$").unwrap(),
+        Regex::new(r"(?i)count\s+(?:all\s+)?(?:[A-Za-z\s]+\s+)?employees?\s+(in|from|of)\s+(?P<dept>[A-Za-z][A-Za-z\s]*?)(\s+department)?$").unwrap(),
+        Regex::new(r"(?i)how\s+many\s+(?:all\s+)?(?:[A-Za-z\s]+\s+)?employees?\s+(are\s+)?(in|from|of)\s+(?P<dept>[A-Za-z][A-Za-z\s]*?)(\s+department)?$").unwrap(),
     ]
 });
 

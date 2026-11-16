@@ -219,6 +219,28 @@ fn test_26_count_by_department_hr() {
     assert_eq!(result.params.department_name.as_deref(), Some("HR"));
 }
 
+#[test]
+fn test_26b_count_active_employees() {
+    let result = detect_intent("Count active employees");
+    assert_eq!(result.intent, Intent::GetEmployeeCount);
+    assert_eq!(result.params.status.as_deref(), Some("Active"));
+}
+
+#[test]
+fn test_26c_count_inactive_employees_in_dept() {
+    let result = detect_intent("Count inactive employees in IT");
+    assert_eq!(result.intent, Intent::GetEmployeeCount);
+    assert_eq!(result.params.status.as_deref(), Some("Inactive"));
+    assert_eq!(result.params.department_name.as_deref(), Some("IT"));
+}
+
+#[test]
+fn test_26d_count_on_leave_staff() {
+    let result = detect_intent("how many on leave staff");
+    assert_eq!(result.intent, Intent::GetEmployeeCount);
+    assert_eq!(result.params.status.as_deref(), Some("On Leave"));
+}
+
 // -----------------------------------------------------------------------------
 // Category 6: GetDepartmentList
 // -----------------------------------------------------------------------------
