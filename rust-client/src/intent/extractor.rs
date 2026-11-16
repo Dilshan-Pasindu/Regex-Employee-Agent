@@ -25,7 +25,13 @@ pub fn extract_params(prompt: &str) -> ExtractedParams {
     }
 
     // Full name (first + last)
-    if let Some(caps) = RE_EXTRACT_FULL_NAME.captures(prompt) {
+    // 1. Check explicit "named/called <first> <last>"
+    if let Some(caps) = regex::Regex::new(r"(?i)(?:named?|called)\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)").unwrap().captures(prompt) {
+        if let (Some(first), Some(last)) = (caps.name("first"), caps.name("last")) {
+            params.first_name = Some(first.as_str().to_string());
+            params.last_name  = Some(last.as_str().to_string());
+        }
+    } else if let Some(caps) = regex::Regex::new(r"(?i)(?:add|create|insert|hire)\s+(?:a\s+)?(?:new\s+)?employee\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)").unwrap().captures(prompt) {
         if let (Some(first), Some(last)) = (caps.name("first"), caps.name("last")) {
             params.first_name = Some(first.as_str().to_string());
             params.last_name  = Some(last.as_str().to_string());
@@ -69,10 +75,10 @@ pub fn extract_params(prompt: &str) -> ExtractedParams {
         }
     }
 
-    // Also try to extract status as a standalone keyword for update commands
+    // Also try to extract status as a standalone keyword (e.g. "show active employees", "on leave employees")
     if params.status.is_none() {
-        for status_val in &["inactive", "active", "on leave"] {
-            let pattern = format!(r"(?i)\bstatus\s+to\s+{}", regex::escape(status_val));
+        for status_val in &["on leave", "inactive", "active"] {
+            let pattern = format!(r"(?i)\b{}\b", regex::escape(status_val));
             if let Ok(re) = regex::Regex::new(&pattern) {
                 if re.is_match(prompt) {
                     params.status = Some(normalise_status(status_val));

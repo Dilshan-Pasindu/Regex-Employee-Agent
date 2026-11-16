@@ -21,7 +21,20 @@ pub fn detect_intent(raw_prompt: &str) -> IntentResult {
         };
     }
 
-    // --- PRIORITY 1: get_employee_by_id ---
+    // --- PRIORITY 1: update_employee ---
+    // Must come BEFORE get_employee_by_id so "update employee 1001 ..." is not mistaken for a read lookup
+    for re in RE_UPDATE_EMPLOYEE.iter() {
+        if re.is_match(prompt) {
+            return IntentResult {
+                intent: Intent::UpdateEmployee,
+                params: extract_params(prompt),
+                confidence: 90,
+                raw_prompt: raw_prompt.to_string(),
+            };
+        }
+    }
+
+    // --- PRIORITY 2: get_employee_by_id ---
     // Must come BEFORE get_all_employees to avoid "show employee 1001" matching list
     for re in RE_GET_BY_ID.iter() {
         if re.is_match(prompt) {
@@ -29,19 +42,6 @@ pub fn detect_intent(raw_prompt: &str) -> IntentResult {
                 intent: Intent::GetEmployeeById,
                 params: extract_params(prompt),
                 confidence: 95,
-                raw_prompt: raw_prompt.to_string(),
-            };
-        }
-    }
-
-    // --- PRIORITY 2: update_employee ---
-    // Must come BEFORE search to avoid "update employee 1001 department to IT" being mistaken
-    for re in RE_UPDATE_EMPLOYEE.iter() {
-        if re.is_match(prompt) {
-            return IntentResult {
-                intent: Intent::UpdateEmployee,
-                params: extract_params(prompt),
-                confidence: 90,
                 raw_prompt: raw_prompt.to_string(),
             };
         }

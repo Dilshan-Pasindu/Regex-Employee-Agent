@@ -206,7 +206,7 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
             let last  = p.last_name.as_deref().ok_or("Last name is required for adding an employee.")?;
             let email = p.email.as_deref().ok_or("Email is required. Example: john.smith@example.com")?;
 
-            let mut args = json!({
+            let args = json!({
                 "firstName": first,
                 "lastName": last,
                 "email": email,

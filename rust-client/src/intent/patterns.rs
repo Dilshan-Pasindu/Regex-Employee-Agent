@@ -97,7 +97,7 @@ pub static RE_EXTRACT_ID: Lazy<Regex> = Lazy::new(||
 
 /// Extract first + last name
 pub static RE_EXTRACT_FULL_NAME: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:named?\s+|employee\s+)?(?P<first>[A-Z][a-z]+)\s+(?P<last>[A-Z][a-z]+)").unwrap()
+    Regex::new(r"(?i)(?:named?|called|\bemployee)\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)").unwrap()
 );
 
 /// Extract department name from "in/from/of <DEPT> department"
