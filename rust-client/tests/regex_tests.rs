@@ -5,10 +5,7 @@
 //         selective projection, precedence, edge cases, and safety confirmation.
 // =============================================================================
 
-use employee_mcp_client::{
-    intent::detector::detect_intent,
-    models::Intent,
-};
+use employee_mcp_client::{intent::detector::detect_intent, models::Intent};
 
 // -----------------------------------------------------------------------------
 // Category 1: GetAllEmployees (Case variations & Alternate phrasing)
@@ -52,11 +49,26 @@ fn test_06_get_all_employees_records_phrasing() {
 
 #[test]
 fn test_06b_get_all_employees_with_details_keyword() {
-    assert_eq!(detect_intent("show all employees details").intent, Intent::GetAllEmployees);
-    assert_eq!(detect_intent("show all employee details").intent, Intent::GetAllEmployees);
-    assert_eq!(detect_intent("show employees details").intent, Intent::GetAllEmployees);
-    assert_eq!(detect_intent("list all employees info").intent, Intent::GetAllEmployees);
-    assert_eq!(detect_intent("display all employees data").intent, Intent::GetAllEmployees);
+    assert_eq!(
+        detect_intent("show all employees details").intent,
+        Intent::GetAllEmployees
+    );
+    assert_eq!(
+        detect_intent("show all employee details").intent,
+        Intent::GetAllEmployees
+    );
+    assert_eq!(
+        detect_intent("show employees details").intent,
+        Intent::GetAllEmployees
+    );
+    assert_eq!(
+        detect_intent("list all employees info").intent,
+        Intent::GetAllEmployees
+    );
+    assert_eq!(
+        detect_intent("display all employees data").intent,
+        Intent::GetAllEmployees
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -101,8 +113,18 @@ fn test_11_projection_department_and_designation() {
     let result = detect_intent("Find employee 1001 departmentName and designationId");
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1001));
-    assert!(result.params.requested_fields.contains(&"departmentName".to_string()));
-    assert!(result.params.requested_fields.contains(&"designationId".to_string()));
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"departmentName".to_string())
+    );
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"designationId".to_string())
+    );
 }
 
 #[test]
@@ -110,8 +132,18 @@ fn test_12_projection_salary_and_email() {
     let result = detect_intent("Show employee 1002 salary and email");
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1002));
-    assert!(result.params.requested_fields.contains(&"salary".to_string()));
-    assert!(result.params.requested_fields.contains(&"email".to_string()));
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"salary".to_string())
+    );
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"email".to_string())
+    );
 }
 
 #[test]
@@ -119,7 +151,12 @@ fn test_13_projection_status_only() {
     let result = detect_intent("Find employee 1003 status");
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1003));
-    assert!(result.params.requested_fields.contains(&"status".to_string()));
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"status".to_string())
+    );
 }
 
 #[test]
@@ -127,7 +164,12 @@ fn test_14_projection_hire_date() {
     let result = detect_intent("Get employee 1004 hire date");
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1004));
-    assert!(result.params.requested_fields.contains(&"hireDate".to_string()));
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"hireDate".to_string())
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -152,7 +194,10 @@ fn test_16_search_by_department_short() {
 fn test_17_search_by_department_engineering() {
     let result = detect_intent("show employees in Engineering");
     assert_eq!(result.intent, Intent::SearchEmployees);
-    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+    assert_eq!(
+        result.params.department_name.as_deref(),
+        Some("Engineering")
+    );
 }
 
 #[test]
@@ -295,7 +340,10 @@ fn test_32_update_department() {
     assert_eq!(result.intent, Intent::UpdateEmployee);
     assert_eq!(result.params.employee_id, Some(1001));
     assert_eq!(result.params.field_to_update.as_deref(), Some("department"));
-    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+    assert_eq!(
+        result.params.department_name.as_deref(),
+        Some("Engineering")
+    );
 }
 
 #[test]
@@ -376,17 +424,38 @@ fn test_41_empty_string_rejected() {
 
 #[test]
 fn test_42_write_operations_require_confirmation() {
-    assert!(Intent::AddEmployee.requires_confirmation(), "AddEmployee MUST require confirmation");
-    assert!(Intent::UpdateEmployee.requires_confirmation(), "UpdateEmployee MUST require confirmation");
+    assert!(
+        Intent::AddEmployee.requires_confirmation(),
+        "AddEmployee MUST require confirmation"
+    );
+    assert!(
+        Intent::UpdateEmployee.requires_confirmation(),
+        "UpdateEmployee MUST require confirmation"
+    );
 }
 
 #[test]
 fn test_43_read_operations_do_not_require_confirmation() {
-    assert!(!Intent::GetAllEmployees.requires_confirmation(), "GetAllEmployees must be read-only");
-    assert!(!Intent::GetEmployeeById.requires_confirmation(), "GetEmployeeById must be read-only");
-    assert!(!Intent::SearchEmployees.requires_confirmation(), "SearchEmployees must be read-only");
-    assert!(!Intent::GetEmployeeCount.requires_confirmation(), "GetEmployeeCount must be read-only");
-    assert!(!Intent::GetDepartmentList.requires_confirmation(), "GetDepartmentList must be read-only");
+    assert!(
+        !Intent::GetAllEmployees.requires_confirmation(),
+        "GetAllEmployees must be read-only"
+    );
+    assert!(
+        !Intent::GetEmployeeById.requires_confirmation(),
+        "GetEmployeeById must be read-only"
+    );
+    assert!(
+        !Intent::SearchEmployees.requires_confirmation(),
+        "SearchEmployees must be read-only"
+    );
+    assert!(
+        !Intent::GetEmployeeCount.requires_confirmation(),
+        "GetEmployeeCount must be read-only"
+    );
+    assert!(
+        !Intent::GetDepartmentList.requires_confirmation(),
+        "GetDepartmentList must be read-only"
+    );
 }
 
 // -----------------------------------------------------------------------------
@@ -398,8 +467,18 @@ fn test_44_vocabulary_driven_field_aliases() {
     let result = detect_intent("find employee 1001 division and wage");
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1001));
-    assert!(result.params.requested_fields.contains(&"departmentName".to_string()));
-    assert!(result.params.requested_fields.contains(&"salary".to_string()));
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"departmentName".to_string())
+    );
+    assert!(
+        result
+            .params
+            .requested_fields
+            .contains(&"salary".to_string())
+    );
 }
 
 #[test]

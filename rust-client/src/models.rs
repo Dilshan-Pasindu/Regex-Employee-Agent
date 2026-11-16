@@ -102,15 +102,15 @@ pub enum Intent {
 impl Intent {
     pub fn tool_name(&self) -> Option<&str> {
         match self {
-            Intent::GetAllEmployees    => Some("get_all_employees"),
-            Intent::GetEmployeeById    => Some("get_employee_by_id"),
-            Intent::SearchEmployees    => Some("search_employees"),
-            Intent::GetDepartmentList  => Some("get_department_list"),
+            Intent::GetAllEmployees => Some("get_all_employees"),
+            Intent::GetEmployeeById => Some("get_employee_by_id"),
+            Intent::SearchEmployees => Some("search_employees"),
+            Intent::GetDepartmentList => Some("get_department_list"),
             Intent::GetDesignationList => Some("get_designation_list"),
-            Intent::GetEmployeeCount   => Some("get_employee_count"),
-            Intent::AddEmployee        => Some("add_employee"),
-            Intent::UpdateEmployee     => Some("update_employee"),
-            Intent::Unknown(_)         => None,
+            Intent::GetEmployeeCount => Some("get_employee_count"),
+            Intent::AddEmployee => Some("add_employee"),
+            Intent::UpdateEmployee => Some("update_employee"),
+            Intent::Unknown(_) => None,
         }
     }
 
@@ -156,4 +156,3 @@ pub struct ToolExecutionResult {
     pub data: Option<Value>,
     pub raw_response: String,
 }
-

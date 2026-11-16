@@ -108,7 +108,10 @@ pub fn extract_params(prompt: &str) -> ExtractedParams {
 /// Extract field name and new value for update_employee operations
 fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
     // "salary to 95000"
-    if let Some(caps) = regex::Regex::new(r"(?i)salary\s+to\s+(?P<val>[0-9]+(?:\.[0-9]+)?)").unwrap().captures(prompt) {
+    if let Some(caps) = regex::Regex::new(r"(?i)salary\s+to\s+(?P<val>[0-9]+(?:\.[0-9]+)?)")
+        .unwrap()
+        .captures(prompt)
+    {
         params.field_to_update = Some("salary".to_string());
         params.new_value = caps.name("val").map(|v| v.as_str().to_string());
         if params.salary.is_none() {
@@ -116,7 +119,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "department to <name>"
-    if let Some(caps) = regex::Regex::new(r"(?i)department\s+to\s+(?P<val>[A-Za-z][A-Za-z\s]*?)(?:\s*$)").unwrap().captures(prompt) {
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)department\s+to\s+(?P<val>[A-Za-z][A-Za-z\s]*?)(?:\s*$)")
+            .unwrap()
+            .captures(prompt)
+    {
         params.field_to_update = Some("department".to_string());
         let dept = caps.name("val").map(|v| v.as_str().trim().to_string());
         params.new_value = dept.clone();
@@ -125,7 +132,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "designation to <name>"
-    if let Some(caps) = regex::Regex::new(r"(?i)designation\s+to\s+(?P<val>[A-Za-z][A-Za-z\s\/]+?)(?:\s*$)").unwrap().captures(prompt) {
+    if let Some(caps) =
+        regex::Regex::new(r"(?i)designation\s+to\s+(?P<val>[A-Za-z][A-Za-z\s\/]+?)(?:\s*$)")
+            .unwrap()
+            .captures(prompt)
+    {
         params.field_to_update = Some("designation".to_string());
         let desig = caps.name("val").map(|v| v.as_str().trim().to_string());
         params.new_value = desig.clone();
@@ -134,7 +145,10 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "status to <value>"
-    if let Some(caps) = regex::Regex::new(r"(?i)status\s+to\s+(?P<val>active|inactive|on\s+leave)").unwrap().captures(prompt) {
+    if let Some(caps) = regex::Regex::new(r"(?i)status\s+to\s+(?P<val>active|inactive|on\s+leave)")
+        .unwrap()
+        .captures(prompt)
+    {
         params.field_to_update = Some("status".to_string());
         let val = caps.name("val").map(|v| normalise_status(v.as_str()));
         params.new_value = val.clone();
@@ -153,4 +167,3 @@ pub fn normalise_status(raw: &str) -> String {
 pub fn extract_requested_fields(prompt: &str) -> Vec<String> {
     crate::intent::vocabulary::Vocabulary::get().match_requested_fields(prompt)
 }
-

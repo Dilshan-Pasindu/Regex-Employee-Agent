@@ -115,4 +115,3 @@ pub fn detect_intent(raw_prompt: &str) -> IntentResult {
         raw_prompt: raw_prompt.to_string(),
     }
 }
-

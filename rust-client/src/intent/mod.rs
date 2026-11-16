@@ -5,4 +5,3 @@ pub mod detector;
 pub mod extractor;
 pub mod patterns;
 pub mod vocabulary;
-

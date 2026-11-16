@@ -191,6 +191,7 @@ field_aliases:
 
   salary:
     - "salary"
+    - "salaries"
     - "pay"
     - "wage"
     - "compensation"
@@ -231,6 +232,7 @@ field_aliases:
 
   fullName:
     - "name"
+    - "names"
     - "full name"
 
 # -----------------------------------------------------------------------------

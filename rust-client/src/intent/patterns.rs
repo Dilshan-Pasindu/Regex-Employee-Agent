@@ -3,9 +3,9 @@
 // No LLM, no AI. Pure Regex compiled dynamically from external vocabulary.
 // =============================================================================
 
+use crate::intent::vocabulary::Vocabulary;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use crate::intent::vocabulary::Vocabulary;
 
 // ---------------------------------------------------------------------------
 // get_all_employees patterns
@@ -37,9 +37,15 @@ pub static RE_GET_BY_ID: Lazy<Vec<Regex>> = Lazy::new(|| {
     let verbs = Vocabulary::alternation(&v.verbs);
 
     vec![
-        Regex::new(&format!(r"(?i)({verbs})\s+employee\s+(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{{4,}})")).unwrap(),
+        Regex::new(&format!(
+            r"(?i)({verbs})\s+employee\s+(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{{4,}})"
+        ))
+        .unwrap(),
         Regex::new(r"(?i)employee\s+(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{4,})").unwrap(),
-        Regex::new(&format!(r"(?i)({verbs})\s+(?:employee\s+)?(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})")).unwrap(),
+        Regex::new(&format!(
+            r"(?i)({verbs})\s+(?:employee\s+)?(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})"
+        ))
+        .unwrap(),
     ]
 });
 
@@ -57,7 +63,7 @@ pub static RE_SEARCH_EMPLOYEES: Lazy<Vec<Regex>> = Lazy::new(|| {
 
     vec![
         // By department
-        Regex::new(&format!(r"(?i)({verbs})\s+employees?\s+({preps})\s+(?:the\s+)?(?P<dept>[A-Za-z][A-Za-z\s]*?)(?:\s+department)?$")).unwrap(),
+        Regex::new(&format!(r"(?i)({verbs})\s+(?:all\s+)?employees?\s+({preps})\s+(?:the\s+)?(?P<dept>[A-Za-z][A-Za-z\s]*?)(?:\s+department)?(?:\s+(?:earning|salary|making|with|who|and)\b.*)?$")).unwrap(),
         Regex::new(r"(?i)(?P<dept>[A-Za-z]+)\s+department\s+employees?").unwrap(),
         // By name
         Regex::new(&format!(r"(?i)({verbs})\s+(employees?|staff)\s+({name_ind})\s+(?P<name>[A-Za-z][A-Za-z\s]+)$")).unwrap(),
@@ -84,7 +90,10 @@ pub static RE_GET_DEPARTMENTS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
         Regex::new(&format!(r"(?i)^({verbs})\s+(all\s+)?({targets})$")).unwrap(),
         Regex::new(&format!(r"(?i)^({standalone})$")).unwrap(),
-        Regex::new(&format!(r"(?i)^(give\s+me\s+|show\s+me\s+)?(all\s+)?({targets})$")).unwrap(),
+        Regex::new(&format!(
+            r"(?i)^(give\s+me\s+|show\s+me\s+)?(all\s+)?({targets})$"
+        ))
+        .unwrap(),
     ]
 });
 
@@ -122,7 +131,10 @@ pub static RE_ADD_EMPLOYEE: Lazy<Vec<Regex>> = Lazy::new(|| {
 
     vec![
         Regex::new(&format!(r"(?i)^({verbs})\s+(an?\s+)?(new\s+)?employee")).unwrap(),
-        Regex::new(&format!(r"(?i)^({verbs})\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)")).unwrap(),
+        Regex::new(&format!(
+            r"(?i)^({verbs})\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)"
+        ))
+        .unwrap(),
         Regex::new(r"(?i)^new\s+employee\s+(?:named?\s+)?(?P<first>[A-Za-z]+)").unwrap(),
     ]
 });
@@ -146,56 +158,52 @@ pub static RE_UPDATE_EMPLOYEE: Lazy<Vec<Regex>> = Lazy::new(|| {
 // ---------------------------------------------------------------------------
 
 /// Extract employee ID (4+ digit number)
-pub static RE_EXTRACT_ID: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:employee\s+)?(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{4,})").unwrap()
-);
+pub static RE_EXTRACT_ID: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(?:employee\s+)?(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{4,})").unwrap());
 
 /// Extract first + last name
-pub static RE_EXTRACT_FULL_NAME: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:named?|called|\bemployee)\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)").unwrap()
-);
+pub static RE_EXTRACT_FULL_NAME: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:named?|called|\bemployee)\s+(?P<first>[A-Za-z]+)\s+(?P<last>[A-Za-z]+)")
+        .unwrap()
+});
 
 /// Extract department name from "in/from/of <DEPT> department"
-pub static RE_EXTRACT_DEPT: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:in|from|of|at|within|to)\s+(?:the\s+)?(?P<dept>[A-Za-z][A-Za-z\s]*?)(?:\s+department)?$").unwrap()
-);
+pub static RE_EXTRACT_DEPT: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:in|from|of|at|within|to)\s+(?:the\s+)?(?P<dept>[A-Za-z][A-Za-z\s]*?)(?:\s+department)?(?:\s+(?:earning|salary|making|with|who|and)\b|$)").unwrap()
+});
 
 /// Extract designation name after "as/designation"
-pub static RE_EXTRACT_DESIG: Lazy<Regex> = Lazy::new(||
+pub static RE_EXTRACT_DESIG: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(?:as|designation)\s+(?P<desig>[A-Za-z][A-Za-z\s\/]+?)(?:\s+with|\s+salary|\s+hire|$)").unwrap()
-);
+});
 
 /// Extract email
-pub static RE_EXTRACT_EMAIL: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:email\s+)?(?P<email>[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})").unwrap()
-);
+pub static RE_EXTRACT_EMAIL: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:email\s+)?(?P<email>[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})")
+        .unwrap()
+});
 
 /// Extract salary (number after "salary")
-pub static RE_EXTRACT_SALARY: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)salary\s+(?P<salary>[0-9]+(?:\.[0-9]{1,2})?)").unwrap()
-);
+pub static RE_EXTRACT_SALARY: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)salary\s+(?P<salary>-?[0-9]+(?:\.[0-9]{1,2})?)").unwrap());
 
 /// Extract hire date (yyyy-MM-dd format)
-pub static RE_EXTRACT_DATE: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)(?:hire\s*date|hired?)\s+(?P<date>\d{4}-\d{2}-\d{2})").unwrap()
-);
+pub static RE_EXTRACT_DATE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)(?:hire\s*date|hired?)\s+(?P<date>\d{4}-\d{2}-\d{2})").unwrap());
 
 /// Extract status
-pub static RE_EXTRACT_STATUS: Lazy<Regex> = Lazy::new(||
+pub static RE_EXTRACT_STATUS: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)status\s+(?:to\s+)?(?P<status>active|inactive|on\s+leave)").unwrap()
-);
+});
 
 /// Extract phone number
-pub static RE_EXTRACT_PHONE: Lazy<Regex> = Lazy::new(||
+pub static RE_EXTRACT_PHONE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"(?i)(?:phone|mobile|tel|contact)\s+(?P<phone>[0-9+\-\s]{7,20})").unwrap()
-);
+});
 
 /// Exit commands
-pub static RE_EXIT: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)^(exit|quit|bye|goodbye|q|:q)$").unwrap()
-);
+pub static RE_EXIT: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"(?i)^(exit|quit|bye|goodbye|q|:q)$").unwrap());
 
 /// Help commands
-pub static RE_HELP: Lazy<Regex> = Lazy::new(||
-    Regex::new(r"(?i)^(help|\?|commands?)$").unwrap()
-);
+pub static RE_HELP: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^(help|\?|commands?)$").unwrap());

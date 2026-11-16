@@ -5,11 +5,11 @@
 // detection keywords, synonyms, suffixes, field aliases, and status normalisation.
 // =============================================================================
 
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use once_cell::sync::Lazy;
-use serde::{Deserialize, Serialize};
 
 const EMBEDDED_YAML: &str = include_str!("../../config/vocabulary.yaml");
 
@@ -93,7 +93,12 @@ impl Vocabulary {
             Some(PathBuf::from("config/vocabulary.yaml")),
             Some(PathBuf::from("../config/vocabulary.yaml")),
             Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("config/vocabulary.yaml")),
-            Some(PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().map(|p| p.join("config/vocabulary.yaml")).unwrap_or_default()),
+            Some(
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .parent()
+                    .map(|p| p.join("config/vocabulary.yaml"))
+                    .unwrap_or_default(),
+            ),
         ];
 
         for candidate in candidates.into_iter().flatten() {
