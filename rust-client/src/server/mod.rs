@@ -222,6 +222,7 @@ async fn process_handler(
     });
 
     // Step 4 — call MCP tool
+    let requested_fields = intent_result.params.requested_fields.clone();
     let mut client = state.client.lock().await;
     match client.call_tool(tool, args).await {
         Ok(exec_result) => {
@@ -231,13 +232,16 @@ async fn process_handler(
                 value: json!(if exec_result.success { "200 OK" } else { "Error" }),
             });
 
+            // Apply selective field projection — same logic as the CLI display_result()
+            let projected = exec_result.data.map(|data| project_fields(data, &requested_fields));
+
             Ok(Json(ProcessResponse {
                 prompt,
                 intent: intent_name,
                 tool: Some(tool.clone()),
                 params: params_json,
                 steps,
-                result: exec_result.data.or_else(|| {
+                result: projected.or_else(|| {
                     exec_result.message.as_ref().map(|m| json!({"message": m}))
                 }),
                 success: exec_result.success,
@@ -288,6 +292,7 @@ fn intent_label(intent: &Intent) -> String {
 fn params_to_json(ir: &IntentResult) -> Value {
     let p = &ir.params;
     let mut obj = serde_json::Map::new();
+    if !p.requested_fields.is_empty() { obj.insert("requestedFields".into(), json!(p.requested_fields)); }
     if let Some(id) = p.employee_id      { obj.insert("employeeId".into(), json!(id)); }
     if let Some(ref v) = p.first_name    { obj.insert("firstName".into(), json!(v)); }
     if let Some(ref v) = p.last_name     { obj.insert("lastName".into(), json!(v)); }
@@ -376,5 +381,65 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
         }
         GetAllEmployees | GetDepartmentList | GetDesignationList => Ok(json!({})),
         Unknown(_) => Ok(json!({})),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Selective field projection — mirrors display_result() in main.rs
+//
+// When the user asks for specific fields (e.g. "find employee 1001 departmentName"),
+// the requested_fields vec is non-empty and we filter the result accordingly.
+// When empty, the full object/array is returned as-is.
+// ---------------------------------------------------------------------------
+fn project_row(obj: &serde_json::Map<String, Value>, requested_fields: &[String]) -> Value {
+    if requested_fields.is_empty() {
+        return Value::Object(obj.clone());
+    }
+
+    let mut out = serde_json::Map::new();
+
+    // Always include employeeId for context (same as CLI)
+    if let Some(id_val) = obj.get("employeeId") {
+        out.insert("employeeId".to_string(), id_val.clone());
+    }
+
+    for rf in requested_fields {
+        if rf.eq_ignore_ascii_case("employeeId") {
+            continue; // already added
+        }
+        // Case-insensitive field lookup
+        if let Some((k, v)) = obj.iter().find(|(k, _)| k.eq_ignore_ascii_case(rf)) {
+            out.insert(k.clone(), v.clone());
+        }
+    }
+
+    // If nothing matched (fields not present in this object), fall back to full row
+    if out.len() <= 1 {
+        return Value::Object(obj.clone());
+    }
+
+    Value::Object(out)
+}
+
+fn project_fields(data: Value, requested_fields: &[String]) -> Value {
+    if requested_fields.is_empty() {
+        return data;
+    }
+    match data {
+        Value::Array(rows) => {
+            let projected: Vec<Value> = rows
+                .into_iter()
+                .map(|row| {
+                    if let Value::Object(ref obj) = row {
+                        project_row(obj, requested_fields)
+                    } else {
+                        row
+                    }
+                })
+                .collect();
+            Value::Array(projected)
+        }
+        Value::Object(ref obj) => project_row(obj, requested_fields),
+        other => other,
     }
 }
