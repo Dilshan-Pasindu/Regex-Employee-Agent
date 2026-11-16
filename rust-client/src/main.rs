@@ -1,5 +1,9 @@
 // =============================================================================
-// main.rs — Employee MCP Client: Interactive Terminal CLI (Phase 2)
+// main.rs — Employee MCP Client
+//
+// Two modes (selected by CLI args):
+//   --server [--port PORT]  → Axum HTTP server on PORT (default 5001)
+//   (no args)               → Interactive terminal CLI
 //
 // Architecture:
 //   User Prompt → Regex Intent Detector → Parameter Extractor →
@@ -16,10 +20,14 @@ use employee_mcp_client::{
     intent::patterns::{RE_EXIT, RE_HELP},
     mcp::client::McpClient,
     models::{Intent, IntentResult, ToolExecutionResult},
+    server::{build_router, AppState},
 };
 
+use axum;
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Write};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,21 +41,21 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let args: Vec<String> = std::env::args().collect();
+    let server_mode = args.contains(&"--server".to_string());
+    let port: u16 = args
+        .windows(2)
+        .find(|w| w[0] == "--port")
+        .and_then(|w| w[1].parse().ok())
+        .unwrap_or(5001);
+
     let config = Config::from_env();
 
-    println!("╔══════════════════════════════════════════════════════╗");
-    println!("║   Employee Management Agent — MCP Client v1.0.0     ║");
-    println!("║   Phase 2: Deterministic Regex Intent Engine         ║");
-    println!("║   No LLM. No AI. Pure Regex routing via MCP/STDIO.  ║");
-    println!("╚══════════════════════════════════════════════════════╝");
-    println!();
-    println!("  Starting .NET MCP Server...");
-
-    let mut client = match McpClient::connect(&config).await {
+    eprintln!("  Starting .NET MCP Server...");
+    let client = match McpClient::connect(&config).await {
         Ok(c) => {
-            println!("  ✓ MCP Server connected. {} tools discovered.", c.discovered_tools.len());
-            println!("  ✓ Tools: {}", c.tool_names().join(", "));
-            println!();
+            eprintln!("  ✓ MCP Server connected. {} tools discovered.", c.discovered_tools.len());
+            eprintln!("  ✓ Tools: {}", c.tool_names().join(", "));
             c
         }
         Err(e) => {
@@ -58,7 +66,24 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
-    print_help();
+    if server_mode {
+        // -----------------------------------------------------------------------
+        // HTTP Server mode — Axum on :PORT
+        // -----------------------------------------------------------------------
+        let state = Arc::new(AppState {
+            client: Mutex::new(client),
+        });
+        let app = build_router(state);
+        let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
+        eprintln!("  ✓ Rust HTTP service listening on http://0.0.0.0:{}", port);
+        axum::serve(listener, app).await?;
+        return Ok(());
+    }
+
+    // -------------------------------------------------------------------------
+    // Interactive CLI mode (original Phase 2 behaviour)
+    // -------------------------------------------------------------------------
+    let mut client = client;
 
     let stdin = io::stdin();
     loop {

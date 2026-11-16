@@ -10,3 +10,4 @@ pub mod intent;
 pub mod mcp;
 pub mod models;
 pub mod process;
+pub mod server;

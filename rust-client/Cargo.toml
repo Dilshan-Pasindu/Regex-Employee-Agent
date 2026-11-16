@@ -15,5 +15,9 @@ thiserror    = "1"
 tracing            = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# HTTP server layer (Phase 3 — Axum)
+axum         = { version = "0.7", features = ["json"] }
+tower-http   = { version = "0.5", features = ["cors"] }
+
 [profile.release]
 opt-level = 3
