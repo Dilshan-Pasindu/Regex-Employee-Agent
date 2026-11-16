@@ -1,0 +1,259 @@
+# =============================================================================
+# vocabulary.yaml — Intent Engine Vocabulary & Synonym Dictionary
+#
+# Edit this file to add new verbs, synonyms, suffixes, or field aliases without
+# modifying or recompiling Rust code.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Intent Vocabulary
+# -----------------------------------------------------------------------------
+intents:
+  get_all_employees:
+    verbs:
+      - "show"
+      - "list"
+      - "display"
+      - "get"
+      - "fetch"
+      - "view"
+    targets:
+      - "employees"
+      - "employee"
+      - "staff"
+    quantifiers:
+      - "all"
+      - "every"
+      - "the"
+    suffixes:
+      - "details"
+      - "detail"
+      - "records"
+      - "record"
+      - "data"
+      - "info"
+      - "information"
+      - "list"
+    standalone_phrases:
+      - "all employees"
+      - "all employee"
+      - "all staff"
+      - "employee list"
+      - "employees list"
+      - "employee records"
+      - "employees records"
+      - "employee details"
+      - "employees details"
+      - "employee data"
+      - "employees data"
+
+  get_employee_by_id:
+    verbs:
+      - "find"
+      - "get"
+      - "show"
+      - "fetch"
+      - "lookup"
+      - "view"
+      - "display"
+    prefixes:
+      - "employee id"
+      - "employee"
+      - "id"
+      - "#"
+
+  search_employees:
+    verbs:
+      - "find"
+      - "search"
+      - "show"
+      - "get"
+      - "list"
+      - "fetch"
+      - "filter"
+    prepositions:
+      - "in"
+      - "from"
+      - "of"
+      - "at"
+      - "within"
+    name_indicators:
+      - "named"
+      - "name"
+      - "called"
+    designation_indicators:
+      - "with designation"
+      - "who are"
+      - "as"
+      - "role"
+      - "position"
+    statuses:
+      - "active"
+      - "inactive"
+      - "on leave"
+
+  get_department_list:
+    verbs:
+      - "show"
+      - "list"
+      - "get"
+      - "display"
+      - "fetch"
+      - "view"
+    targets:
+      - "departments"
+      - "department"
+    standalone_phrases:
+      - "departments list"
+      - "department list"
+      - "all departments"
+      - "what departments exist"
+      - "what departments are there"
+
+  get_employee_count:
+    count_triggers:
+      - "how many"
+      - "count"
+      - "total number of"
+      - "total count of"
+      - "total"
+      - "number of"
+    targets:
+      - "employees"
+      - "employee"
+      - "staff"
+    standalone_phrases:
+      - "employee count"
+      - "employees count"
+      - "staff count"
+
+  add_employee:
+    verbs:
+      - "add"
+      - "create"
+      - "insert"
+      - "register"
+      - "new"
+      - "hire"
+      - "onboard"
+      - "enroll"
+    targets:
+      - "employee"
+      - "new employee"
+
+  update_employee:
+    verbs:
+      - "update"
+      - "change"
+      - "modify"
+      - "edit"
+      - "set"
+      - "alter"
+    assignment_words:
+      - "to"
+      - "as"
+
+# -----------------------------------------------------------------------------
+# Field Aliases & Projection Keywords
+# Used when users request specific fields (e.g. "show employee 1001 departmentName")
+# -----------------------------------------------------------------------------
+field_aliases:
+  departmentId:
+    - "departmentid"
+    - "department id"
+    - "dept id"
+    - "deptid"
+
+  departmentName:
+    - "departmentname"
+    - "department name"
+    - "dept name"
+    - "department"
+    - "dept"
+    - "division"
+
+  designationId:
+    - "designationid"
+    - "designation id"
+    - "desig id"
+    - "desigid"
+    - "role id"
+    - "title id"
+
+  designationName:
+    - "designationname"
+    - "designation name"
+    - "desig name"
+    - "designation"
+    - "role"
+    - "title"
+    - "position"
+
+  salary:
+    - "salary"
+    - "pay"
+    - "wage"
+    - "compensation"
+    - "package"
+
+  email:
+    - "email"
+    - "mail"
+    - "email address"
+
+  phone:
+    - "phone"
+    - "mobile"
+    - "contact"
+    - "telephone"
+    - "cell"
+
+  hireDate:
+    - "hiredate"
+    - "hire date"
+    - "hired date"
+    - "joining date"
+    - "joined date"
+    - "start date"
+
+  status:
+    - "status"
+    - "employment status"
+    - "state"
+
+  firstName:
+    - "firstname"
+    - "first name"
+
+  lastName:
+    - "lastname"
+    - "last name"
+
+  fullName:
+    - "name"
+    - "full name"
+
+# -----------------------------------------------------------------------------
+# Status Value Normalisation
+# Maps slang/synonyms to database values: "Active", "Inactive", "On Leave"
+# -----------------------------------------------------------------------------
+status_mappings:
+  Active:
+    - "active"
+    - "enabled"
+    - "working"
+    - "current"
+    - "employed"
+  Inactive:
+    - "inactive"
+    - "disabled"
+    - "terminated"
+    - "left"
+    - "resigned"
+    - "fired"
+  "On Leave":
+    - "on leave"
+    - "leave"
+    - "absent"
+    - "vacation"
+    - "holiday"

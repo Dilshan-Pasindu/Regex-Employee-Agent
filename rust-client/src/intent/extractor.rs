@@ -77,7 +77,8 @@ pub fn extract_params(prompt: &str) -> ExtractedParams {
 
     // Also try to extract status as a standalone keyword (e.g. "show active employees", "on leave employees")
     if params.status.is_none() {
-        for status_val in &["on leave", "inactive", "active"] {
+        let vocab = crate::intent::vocabulary::Vocabulary::get();
+        for status_val in vocab.status_mappings.keys() {
             let pattern = format!(r"(?i)\b{}\b", regex::escape(status_val));
             if let Ok(re) = regex::Regex::new(&pattern) {
                 if re.is_match(prompt) {
@@ -144,91 +145,12 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
 }
 
 pub fn normalise_status(raw: &str) -> String {
-    match raw.to_lowercase().trim() {
-        "active"   => "Active".to_string(),
-        "inactive" => "Inactive".to_string(),
-        s if s.contains("leave") => "On Leave".to_string(),
-        other => {
-            let mut c = other.chars();
-            match c.next() {
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-                None => String::new(),
-            }
-        }
-    }
+    crate::intent::vocabulary::Vocabulary::get().normalise_status(raw)
 }
 
 /// Extract specific requested fields mentioned in the prompt for selective display (projection)
+/// Uses field_aliases configured in config/vocabulary.yaml
 pub fn extract_requested_fields(prompt: &str) -> Vec<String> {
-    let mut fields = Vec::new();
-    let lower = prompt.to_lowercase();
-
-    // Check specific fields:
-    // departmentId
-    if lower.contains("departmentid") || lower.contains("department id") || lower.contains("dept id") {
-        fields.push("departmentId".to_string());
-    }
-    // departmentName (or generic department)
-    if lower.contains("departmentname") || lower.contains("department name") || lower.contains("dept name") {
-        fields.push("departmentName".to_string());
-    } else if (lower.contains("department") || lower.contains("dept")) && !fields.contains(&"departmentId".to_string()) {
-        fields.push("departmentName".to_string());
-    }
-
-    // designationId
-    if lower.contains("designationid") || lower.contains("designation id") || lower.contains("desig id") {
-        fields.push("designationId".to_string());
-    }
-    // designationName (or generic designation / title / role)
-    if lower.contains("designationname") || lower.contains("designation name") || lower.contains("desig name") {
-        fields.push("designationName".to_string());
-    } else if (lower.contains("designation") || lower.contains("role") || lower.contains("title")) && !fields.contains(&"designationId".to_string()) {
-        fields.push("designationName".to_string());
-    }
-
-    // salary
-    if lower.contains("salary") || lower.contains("pay") || lower.contains("wage") || lower.contains("compensation") {
-        fields.push("salary".to_string());
-    }
-
-    // email
-    if lower.contains("email") || lower.contains("mail") {
-        fields.push("email".to_string());
-    }
-
-    // phone
-    if lower.contains("phone") || lower.contains("mobile") || lower.contains("contact") {
-        fields.push("phone".to_string());
-    }
-
-    // hireDate
-    if lower.contains("hiredate") || lower.contains("hire date") || lower.contains("hired date") {
-        fields.push("hireDate".to_string());
-    }
-
-    // status
-    if lower.contains("status") {
-        fields.push("status".to_string());
-    }
-
-    // first / last name
-    if lower.contains("firstname") || lower.contains("first name") {
-        fields.push("firstName".to_string());
-    }
-    if lower.contains("lastname") || lower.contains("last name") {
-        fields.push("lastName".to_string());
-    }
-    if (lower.contains("name") || lower.contains("full name")) 
-        && !fields.contains(&"firstName".to_string()) 
-        && !fields.contains(&"departmentName".to_string())
-        && !fields.contains(&"designationName".to_string())
-        && !lower.contains("department")
-        && !lower.contains("designation")
-    {
-        fields.push("firstName".to_string());
-        fields.push("lastName".to_string());
-    }
-
-    fields
+    crate::intent::vocabulary::Vocabulary::get().match_requested_fields(prompt)
 }
 

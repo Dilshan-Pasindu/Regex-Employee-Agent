@@ -1,8 +1,9 @@
-# Regex Patterns Reference
+# Regex Patterns & Vocabulary Reference
 
-All intent patterns are defined in `rust-client/src/intent/patterns.rs` using `once_cell::Lazy<Regex>`.
+All intent patterns and synonym dictionaries are configured externally in **`config/vocabulary.yaml`** (and `rust-client/config/vocabulary.yaml`) and compiled into deterministic Rust Regex patterns via `once_cell::sync::Lazy`.
 
-> **Zero LLM/AI policy:** Every pattern is a hand-crafted, deterministic Rust regex. No machine learning is involved anywhere in intent detection.
+> **Zero LLM/AI policy:** Every pattern is a deterministic Rust regex compiled from the vocabulary configuration. No machine learning is involved anywhere in intent detection.
+> **Customizable:** You can add new verbs, synonyms, suffixes, field aliases, and status mappings directly in `config/vocabulary.yaml` without changing or recompiling Rust code.
 
 ---
 

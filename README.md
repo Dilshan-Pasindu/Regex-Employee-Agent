@@ -30,6 +30,8 @@ MySQL 8.x Database            ← InternAgenticDB
 
 ```
 Spillabs-intern/
+├── config/                       # External Vocabulary & Synonym Configuration
+│   └── vocabulary.yaml           # Editable verbs, suffixes, field aliases, status maps
 ├── database/                     # MySQL seed script
 │   └── InternAgenticDB_Seed_MySQL.sql
 ├── dotnet-mcp-server/            # Phase 1 — .NET 8 MCP Server
@@ -42,14 +44,16 @@ Spillabs-intern/
 │       ├── Program.cs            # MCP STDIO server entry point
 │       └── appsettings.example.json
 ├── rust-client/                  # Phase 2 + Phase 3 Layer 1 — Rust
+│   ├── config/
+│   │   └── vocabulary.yaml       # Primary vocabulary file
 │   ├── src/
-│   │   ├── intent/               # Regex intent detector + extractor + patterns
+│   │   ├── intent/               # Regex intent detector + extractor + dynamic vocabulary
 │   │   ├── mcp/                  # MCP protocol client (STDIO)
 │   │   ├── server/               # Axum HTTP server (port 5001)
 │   │   ├── process/              # .NET child process manager
 │   │   └── main.rs               # CLI mode + --server mode
 │   └── tests/
-│       └── regex_tests.rs        # 44 deterministic regex tests
+│       └── regex_tests.rs        # 46 deterministic regex tests
 ├── backend/                      # Phase 3 Layer 2 — Python/FastAPI (port 5000)
 │   ├── routers/
 │   │   ├── chat.py               # POST /api/chat
@@ -215,7 +219,7 @@ Full interactive docs: **http://localhost:5000/docs**
 ## 🧪 Running Tests
 
 ```bash
-# Rust regex engine — 44 tests
+# Rust regex engine — 46 tests
 cd rust-client
 cargo test
 

@@ -366,3 +366,24 @@ fn test_43_read_operations_do_not_require_confirmation() {
     assert!(!Intent::GetEmployeeCount.requires_confirmation(), "GetEmployeeCount must be read-only");
     assert!(!Intent::GetDepartmentList.requires_confirmation(), "GetDepartmentList must be read-only");
 }
+
+// -----------------------------------------------------------------------------
+// Category 12: External Vocabulary Customization Verification
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_44_vocabulary_driven_field_aliases() {
+    let result = detect_intent("find employee 1001 division and wage");
+    assert_eq!(result.intent, Intent::GetEmployeeById);
+    assert_eq!(result.params.employee_id, Some(1001));
+    assert!(result.params.requested_fields.contains(&"departmentName".to_string()));
+    assert!(result.params.requested_fields.contains(&"salary".to_string()));
+}
+
+#[test]
+fn test_45_vocabulary_status_mapping() {
+    let vocab = employee_mcp_client::intent::vocabulary::Vocabulary::get();
+    assert_eq!(vocab.normalise_status("working"), "Active");
+    assert_eq!(vocab.normalise_status("resigned"), "Inactive");
+    assert_eq!(vocab.normalise_status("vacation"), "On Leave");
+}
