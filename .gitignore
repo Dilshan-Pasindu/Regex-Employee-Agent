@@ -111,6 +111,7 @@ pnpm-debug.log*
 **/__pycache__/
 **/*.py[cod]
 **/*$py.class
+**/.venv
 **/.venv/
 **/venv/
 **/env/
