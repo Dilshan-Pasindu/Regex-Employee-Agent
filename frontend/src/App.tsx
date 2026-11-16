@@ -173,8 +173,8 @@ export default function App() {
                 animation: 'pulseGlow 2s infinite',
                 display: 'inline-block',
               }} />
-              <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>
-                Online · No LLM · Rust Regex
+              <span style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+                Online
               </span>
             </div>
           </div>
@@ -332,9 +332,6 @@ export default function App() {
             {loading ? '…' : 'Send ↑'}
           </button>
         </div>
-        <p style={{ textAlign: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: 6 }}>
-          Deterministic Rust Regex intent detection · Zero AI/LLM
-        </p>
       </div>
 
       {/* ---- Overlays ------------------------------------------------- */}
