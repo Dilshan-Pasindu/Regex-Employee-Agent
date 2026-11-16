@@ -133,6 +133,7 @@ pub struct ExtractedParams {
     pub status: Option<String>,
     pub field_to_update: Option<String>,
     pub new_value: Option<String>,
+    pub requested_fields: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

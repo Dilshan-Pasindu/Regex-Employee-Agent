@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
         println!("  → Calling tool: {} ...", tool_name);
         match client.call_tool(&tool_name, args).await {
             Ok(result) => {
-                display_result(&result);
+                display_result(&result, &intent_result.params.requested_fields);
             }
             Err(e) => {
                 println!("  ✗ Error: {}", e);
@@ -273,8 +273,9 @@ fn build_tool_args(intent: &crate::models::IntentResult) -> Result<Value, String
 
 // =============================================================================
 // Pretty-print tool results to the terminal
+// Supports selective field projection when the user requests specific fields
 // =============================================================================
-fn display_result(result: &crate::models::ToolExecutionResult) {
+fn display_result(result: &crate::models::ToolExecutionResult, requested_fields: &[String]) {
     println!();
     if result.success {
         println!("  ✓ Success{}", result.message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default());
@@ -288,11 +289,11 @@ fn display_result(result: &crate::models::ToolExecutionResult) {
             Value::Array(rows) => {
                 println!("  Results ({} row{}):", rows.len(), if rows.len() == 1 { "" } else { "s" });
                 for (i, row) in rows.iter().enumerate() {
-                    println!("  [{:>2}] {}", i + 1, format_row(row));
+                    println!("  [{:>2}] {}", i + 1, format_row(row, requested_fields));
                 }
             }
             Value::Object(_) => {
-                println!("  {}", format_row(data));
+                println!("  {}", format_row(data, requested_fields));
             }
             other => {
                 println!("  {}", other);
@@ -301,23 +302,53 @@ fn display_result(result: &crate::models::ToolExecutionResult) {
     }
 }
 
-fn format_row(val: &Value) -> String {
+fn format_row(val: &Value, requested_fields: &[String]) -> String {
     if let Some(obj) = val.as_object() {
-        obj.iter()
-            .map(|(k, v)| {
-                let display = match v {
-                    Value::String(s) => s.clone(),
-                    Value::Number(n) => n.to_string(),
-                    Value::Bool(b)   => b.to_string(),
-                    Value::Null      => "—".to_string(),
-                    other            => other.to_string(),
-                };
-                format!("{}: {}", k, display)
-            })
-            .collect::<Vec<_>>()
-            .join("  |  ")
+        if requested_fields.is_empty() {
+            // Display all fields
+            obj.iter()
+                .map(|(k, v)| format!("{}: {}", k, format_field_value(v)))
+                .collect::<Vec<_>>()
+                .join("  |  ")
+        } else {
+            // Display employeeId first for context, then each requested field in order
+            let mut parts = Vec::new();
+            if let Some(id_val) = obj.get("employeeId") {
+                parts.push(format!("employeeId: {}", format_field_value(id_val)));
+            }
+            for rf in requested_fields {
+                if rf.eq_ignore_ascii_case("employeeId") {
+                    continue;
+                }
+                if let Some((k, v)) = obj.iter().find(|(k, _)| k.eq_ignore_ascii_case(rf)) {
+                    let field_entry = format!("{}: {}", k, format_field_value(v));
+                    if !parts.contains(&field_entry) {
+                        parts.push(field_entry);
+                    }
+                }
+            }
+            if parts.is_empty() {
+                // Fallback to all fields if no requested fields matched object properties
+                obj.iter()
+                    .map(|(k, v)| format!("{}: {}", k, format_field_value(v)))
+                    .collect::<Vec<_>>()
+                    .join("  |  ")
+            } else {
+                parts.join("  |  ")
+            }
+        }
     } else {
         val.to_string()
+    }
+}
+
+fn format_field_value(v: &Value) -> String {
+    match v {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b)   => b.to_string(),
+        Value::Null      => "—".to_string(),
+        other            => other.to_string(),
     }
 }
 
