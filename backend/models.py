@@ -45,6 +45,7 @@ class ChatResponse(BaseModel):
     success: bool
     requires_confirmation: Optional[bool] = None
     message: Optional[str] = None
+    suggestions: Optional[List[str]] = None
 
 
 # ---------------------------------------------------------------------------

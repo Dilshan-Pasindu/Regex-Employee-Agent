@@ -170,3 +170,19 @@ fn test_context_preserving_suggestions() {
     let out = generate_suggestions(prompt, &ir, &ctx);
     assert!(out.suggestions.iter().any(|s| s.contains("1005")));
 }
+
+#[test]
+fn test_unknown_prompt_with_numeric_id_suggests_employee_operations() {
+    let prompt = "some unfamiliar text about 1001";
+    let ir = detect_intent(prompt);
+    let ctx = ConversationContext::new();
+
+    let classification = classify_prompt_error(prompt, &ir);
+    assert_eq!(classification.error_type, PromptErrorType::AmbiguousIntent);
+    assert_eq!(classification.detected_entity.as_deref(), Some("1001"));
+
+    let out = generate_suggestions(prompt, &ir, &ctx);
+    assert_eq!(out.error_type, PromptErrorType::AmbiguousIntent);
+    assert!(out.suggestions.contains(&"Find employee 1001".to_string()));
+    assert!(out.suggestions.contains(&"Show employee 1001 details".to_string()));
+}

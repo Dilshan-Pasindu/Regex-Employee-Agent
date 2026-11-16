@@ -55,6 +55,7 @@ async def chat(request: Request, body: ChatRequest):
         success=rust_resp.get("success", False),
         requires_confirmation=rust_resp.get("requires_confirmation"),
         message=rust_resp.get("message"),
+        suggestions=rust_resp.get("suggestions"),
     )
 
     # Persist conversation history

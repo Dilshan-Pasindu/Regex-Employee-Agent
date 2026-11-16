@@ -63,7 +63,7 @@ function TypingIndicator() {
 }
 
 // ---------- Agent bubble --------------------------------------------------
-function AgentBubble({ msg }: { msg: ChatMessage }) {
+function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (text: string) => void }) {
   const r = msg.response;
 
   if (msg.pending) return <TypingIndicator />;
@@ -110,6 +110,43 @@ function AgentBubble({ msg }: { msg: ChatMessage }) {
         <div style={{ color: r?.success === false ? '#ef4444' : 'var(--bot-text)' }}>
           <MarkdownRenderer content={msg.content} />
         </div>
+
+        {/* Suggestion chips */}
+        {r?.suggestions && r.suggestions.length > 0 && onChipClick && (
+          <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {r.suggestions.map((sug, i) => (
+              <button
+                key={i}
+                onClick={() => onChipClick(sug)}
+                style={{
+                  background: 'var(--surface)',
+                  border: '1.5px solid var(--border)',
+                  color: 'var(--text)',
+                  borderRadius: 99,
+                  padding: '5px 14px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  fontFamily: 'var(--font-body)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  boxShadow: '0 1px 4px rgba(124,58,237,0.1)',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg,#7c3aed,#ec4899)';
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.borderColor = 'transparent';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'var(--surface)';
+                  e.currentTarget.style.color = 'var(--text)';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                }}
+              >
+                💡 {sug}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Result table */}
         {r?.result !== undefined && r?.result !== null && (
@@ -336,7 +373,7 @@ export function ChatPanel({ messages, onChipClick }: Props) {
         {messages.map(msg =>
           msg.role === 'user'
             ? <UserBubble key={msg.id} msg={msg} />
-            : <AgentBubble key={msg.id} msg={msg} />
+            : <AgentBubble key={msg.id} msg={msg} onChipClick={onChipClick} />
         )}
         <div ref={bottomRef} />
       </div>

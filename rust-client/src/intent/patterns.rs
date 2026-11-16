@@ -43,7 +43,7 @@ pub static RE_GET_BY_ID: Lazy<Vec<Regex>> = Lazy::new(|| {
         .unwrap(),
         Regex::new(r"(?i)employee\s+(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{4,})").unwrap(),
         Regex::new(&format!(
-            r"(?i)({verbs})\s+(?:employee\s+)?(?:id\s*[:#]?\s*)?(?P<id>\d{{4,}})"
+            r"(?i)({verbs})\s+(?:the\s+)?(?:employee\s+)?(?:id\s*[:#]?\s*|#\s*)?(?P<id>\d{{4,}})(?:\s+(?:details?|records?|data|info(?:rmation)?))?"
         ))
         .unwrap(),
     ]

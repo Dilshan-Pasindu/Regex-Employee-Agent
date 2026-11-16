@@ -51,8 +51,17 @@ pub fn generate_suggestions(
         }
         PromptErrorType::InvalidParameter => templates_invalid_id(),
         PromptErrorType::AmbiguousIntent => {
-            if let Some(ref dept) = classification.detected_entity {
-                templates_department(dept)
+            if let Some(ref entity) = classification.detected_entity {
+                if entity.chars().all(|c| c.is_ascii_digit()) {
+                    vec![
+                        format!("Find employee {}", entity),
+                        format!("Show employee {} details", entity),
+                        format!("Update employee {} salary to 180000", entity),
+                        format!("Find employee {} department name", entity),
+                    ]
+                } else {
+                    templates_department(entity)
+                }
             } else if let Some(ref dept) = context_summary.active_department {
                 templates_department(dept)
             } else {

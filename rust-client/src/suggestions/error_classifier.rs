@@ -142,11 +142,28 @@ pub fn classify_prompt_error(prompt: &str, ir: &IntentResult) -> ClassificationR
 
     // 7. General unknown intent
     match &ir.intent {
-        Intent::Unknown(_) => ClassificationResult {
-            error_type: PromptErrorType::AmbiguousIntent,
-            user_explanation: "I didn't recognize that request. Please see the suggestions below for supported capabilities:".to_string(),
-            detected_entity: None,
-        },
+        Intent::Unknown(_) => {
+            // Check if user mentioned an employee ID anywhere in the prompt
+            if let Some(caps) = crate::intent::patterns::RE_EXTRACT_ID.captures(p) {
+                if let Some(id_str) = caps.name("id") {
+                    let id = id_str.as_str().to_string();
+                    return ClassificationResult {
+                        error_type: PromptErrorType::AmbiguousIntent,
+                        user_explanation: format!(
+                            "I recognized employee ID {}. Here are suggested ways to view or update this employee:",
+                            id
+                        ),
+                        detected_entity: Some(id),
+                    };
+                }
+            }
+
+            ClassificationResult {
+                error_type: PromptErrorType::AmbiguousIntent,
+                user_explanation: "I didn't recognize that request. Please see the suggestions below for supported capabilities:".to_string(),
+                detected_entity: None,
+            }
+        }
         _ => ClassificationResult {
             error_type: PromptErrorType::ValidationError,
             user_explanation: "The request could not be processed due to missing or invalid parameters.".to_string(),

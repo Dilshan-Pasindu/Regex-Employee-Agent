@@ -19,6 +19,7 @@ export interface ChatResponse {
   success: boolean;
   requires_confirmation?: boolean;
   message?: string;
+  suggestions?: string[];
 }
 
 export interface ChatMessage {

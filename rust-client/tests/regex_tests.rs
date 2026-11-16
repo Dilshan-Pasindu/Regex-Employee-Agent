@@ -488,3 +488,17 @@ fn test_45_vocabulary_status_mapping() {
     assert_eq!(vocab.normalise_status("resigned"), "Inactive");
     assert_eq!(vocab.normalise_status("vacation"), "On Leave");
 }
+
+#[test]
+fn test_46_gimme_employee_details() {
+    let result = detect_intent("gimme the 1001 details");
+    assert_eq!(result.intent, Intent::GetEmployeeById);
+    assert_eq!(result.params.employee_id, Some(1001));
+}
+
+#[test]
+fn test_47_give_me_employee_details() {
+    let result = detect_intent("give me employee 1001");
+    assert_eq!(result.intent, Intent::GetEmployeeById);
+    assert_eq!(result.params.employee_id, Some(1001));
+}
