@@ -2,10 +2,13 @@
 // process/mod.rs — Manages the .NET MCP Server child process lifetime
 // =============================================================================
 
-use crate::{config::Config, errors::{McpError, Result}};
-use tokio::process::{Child, Command, ChildStdin, ChildStdout, ChildStderr};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
+use crate::{
+    config::Config,
+    errors::{McpError, Result},
+};
 use std::process::Stdio;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
+use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
 
 pub struct McpServerProcess {
     child: Child,
@@ -37,13 +40,19 @@ impl McpServerProcess {
                 "Failed to start dotnet process: {}. Is .NET 8 installed and was the project already built?", e
             )))?;
 
-        let stdin = child.stdin.take()
+        let stdin = child
+            .stdin
+            .take()
             .ok_or_else(|| McpError::ProcessStart("Could not capture stdin".to_string()))?;
 
-        let stdout_raw = child.stdout.take()
+        let stdout_raw = child
+            .stdout
+            .take()
             .ok_or_else(|| McpError::ProcessStart("Could not capture stdout".to_string()))?;
 
-        let stderr = child.stderr.take()
+        let stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| McpError::ProcessStart("Could not capture stderr".to_string()))?;
 
         let stdout = BufReader::new(stdout_raw).lines();
@@ -56,18 +65,27 @@ impl McpServerProcess {
             Ok(Some(status)) => {
                 return Err(McpError::ProcessStart(format!(
                     ".NET MCP Server exited immediately with status: {}. \
-                     Check appsettings.json for a correct MySQL connection string.", status
+                     Check appsettings.json for a correct MySQL connection string.",
+                    status
                 )));
             }
             Ok(None) => {
                 tracing::info!(".NET MCP Server is running.");
             }
             Err(e) => {
-                return Err(McpError::ProcessStart(format!("Failed to poll process: {}", e)));
+                return Err(McpError::ProcessStart(format!(
+                    "Failed to poll process: {}",
+                    e
+                )));
             }
         }
 
-        Ok(Self { child, stdin, stdout, stderr })
+        Ok(Self {
+            child,
+            stdin,
+            stdout,
+            stderr,
+        })
     }
 
     /// Write a JSON-RPC line to the MCP server's stdin
@@ -90,14 +108,18 @@ impl McpServerProcess {
                 Ok(line)
             }
             Ok(Ok(None)) => Err(McpError::ProcessDied),
-            Ok(Err(e))   => Err(McpError::Io(e)),
-            Err(_)       => Err(McpError::Timeout { secs: timeout_secs }),
+            Ok(Err(e)) => Err(McpError::Io(e)),
+            Err(_) => Err(McpError::Timeout { secs: timeout_secs }),
         }
     }
 
     /// Check if the child process is still alive
     pub fn is_alive(&mut self) -> bool {
-        self.child.try_wait().ok().map(|s| s.is_none()).unwrap_or(false)
+        self.child
+            .try_wait()
+            .ok()
+            .map(|s| s.is_none())
+            .unwrap_or(false)
     }
 
     /// Gracefully terminate the child process
@@ -106,4 +128,3 @@ impl McpServerProcess {
         tracing::info!(".NET MCP Server process terminated.");
     }
 }
-

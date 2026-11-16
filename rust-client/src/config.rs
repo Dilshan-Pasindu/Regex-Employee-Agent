@@ -21,7 +21,10 @@ impl Config {
         // Resolve the dotnet project path relative to our binary
         // so it works from any working directory
         let cargo_manifest = env!("CARGO_MANIFEST_DIR");
-        let project_root = PathBuf::from(cargo_manifest).parent().unwrap().to_path_buf();
+        let project_root = PathBuf::from(cargo_manifest)
+            .parent()
+            .unwrap()
+            .to_path_buf();
         let dotnet_path = project_root
             .join("dotnet-mcp-server")
             .join("EmployeeMcpServer");
@@ -33,4 +36,3 @@ impl Config {
         }
     }
 }
-

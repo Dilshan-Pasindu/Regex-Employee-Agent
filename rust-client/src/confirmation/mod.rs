@@ -3,8 +3,8 @@
 // add_employee and update_employee MUST be confirmed before execution.
 // =============================================================================
 
-use std::io::{self, Write};
 use crate::models::{Intent, IntentResult};
+use std::io::{self, Write};
 
 /// Display a confirmation prompt to the user for write operations.
 /// Returns true only if the user explicitly types "yes" or "y".
@@ -59,13 +59,27 @@ pub fn request_confirmation(intent: &IntentResult) -> bool {
                 }
             } else {
                 // Show all updated fields
-                if let Some(ref f) = p.first_name  { println!("  First Name   : {}", f); }
-                if let Some(ref l) = p.last_name   { println!("  Last Name    : {}", l); }
-                if let Some(ref e) = p.email       { println!("  Email        : {}", e); }
-                if let Some(ref d) = p.department_name { println!("  Department   : {}", d); }
-                if let Some(ref g) = p.designation_name { println!("  Designation  : {}", g); }
-                if let Some(s)    = p.salary       { println!("  Salary       : {}", s); }
-                if let Some(ref st) = p.status     { println!("  Status       : {}", st); }
+                if let Some(ref f) = p.first_name {
+                    println!("  First Name   : {}", f);
+                }
+                if let Some(ref l) = p.last_name {
+                    println!("  Last Name    : {}", l);
+                }
+                if let Some(ref e) = p.email {
+                    println!("  Email        : {}", e);
+                }
+                if let Some(ref d) = p.department_name {
+                    println!("  Department   : {}", d);
+                }
+                if let Some(ref g) = p.designation_name {
+                    println!("  Designation  : {}", g);
+                }
+                if let Some(s) = p.salary {
+                    println!("  Salary       : {}", s);
+                }
+                if let Some(ref st) = p.status {
+                    println!("  Status       : {}", st);
+                }
             }
         }
 
@@ -87,4 +101,3 @@ pub fn request_confirmation(intent: &IntentResult) -> bool {
         false
     }
 }
-

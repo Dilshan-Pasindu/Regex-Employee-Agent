@@ -3,12 +3,12 @@
 // =============================================================================
 
 use crate::{
+    config::Config,
     errors::{McpError, Result},
     models::{JsonRpcRequest, JsonRpcResponse, McpTool, ToolExecutionResult},
     process::McpServerProcess,
-    config::Config,
 };
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
@@ -64,11 +64,14 @@ impl McpClient {
         let resp = self.read_response().await?;
         if let Some(err) = resp.error {
             return Err(McpError::Protocol(format!(
-                "MCP initialize failed: {} (code {})", err.message, err.code
+                "MCP initialize failed: {} (code {})",
+                err.message, err.code
             )));
         }
 
-        let result = resp.result.as_ref()
+        let result = resp
+            .result
+            .as_ref()
             .ok_or_else(|| McpError::Protocol("No result in initialize response".to_string()))?;
 
         let protocol_version = result
@@ -96,21 +99,29 @@ impl McpClient {
 
         let resp = self.read_response().await?;
         if let Some(err) = resp.error {
-            return Err(McpError::Protocol(format!("tools/list failed: {}", err.message)));
+            return Err(McpError::Protocol(format!(
+                "tools/list failed: {}",
+                err.message
+            )));
         }
 
-        let result = resp.result
+        let result = resp
+            .result
             .ok_or_else(|| McpError::Protocol("No result in tools/list response".to_string()))?;
 
-        let tools: Vec<McpTool> = serde_json::from_value(
-            result.get("tools")
-                .cloned()
-                .ok_or_else(|| McpError::Protocol("'tools' key missing in tools/list response".to_string()))?
-        ).map_err(|e| McpError::Protocol(format!("Failed to parse tools list: {}", e)))?;
+        let tools: Vec<McpTool> =
+            serde_json::from_value(result.get("tools").cloned().ok_or_else(|| {
+                McpError::Protocol("'tools' key missing in tools/list response".to_string())
+            })?)
+            .map_err(|e| McpError::Protocol(format!("Failed to parse tools list: {}", e)))?;
 
         tracing::info!("Discovered {} MCP tools:", tools.len());
         for tool in &tools {
-            tracing::info!("  - {} : {}", tool.name, tool.description.as_deref().unwrap_or("(no description)"));
+            tracing::info!(
+                "  - {} : {}",
+                tool.name,
+                tool.description.as_deref().unwrap_or("(no description)")
+            );
         }
 
         self.discovered_tools = tools;
@@ -120,7 +131,11 @@ impl McpClient {
     // -------------------------------------------------------------------------
     // Execute a discovered MCP tool by name with validated arguments
     // -------------------------------------------------------------------------
-    pub async fn call_tool(&mut self, tool_name: &str, arguments: Value) -> Result<ToolExecutionResult> {
+    pub async fn call_tool(
+        &mut self,
+        tool_name: &str,
+        arguments: Value,
+    ) -> Result<ToolExecutionResult> {
         // Verify the tool exists in the discovered catalogue
         let tool_exists = self.discovered_tools.iter().any(|t| t.name == tool_name);
         if !tool_exists {
@@ -128,7 +143,11 @@ impl McpClient {
                 "'{}' was not found in the discovered tool catalogue. \
                  Available tools: {}",
                 tool_name,
-                self.discovered_tools.iter().map(|t| t.name.as_str()).collect::<Vec<_>>().join(", ")
+                self.discovered_tools
+                    .iter()
+                    .map(|t| t.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )));
         }
 
@@ -145,10 +164,14 @@ impl McpClient {
         let resp = self.read_response().await?;
 
         if let Some(err) = resp.error {
-            return Err(McpError::Protocol(format!("Tool '{}' call failed: {}", tool_name, err.message)));
+            return Err(McpError::Protocol(format!(
+                "Tool '{}' call failed: {}",
+                tool_name, err.message
+            )));
         }
 
-        let result = resp.result
+        let result = resp
+            .result
             .ok_or_else(|| McpError::Protocol("No result in tools/call response".to_string()))?;
 
         // Extract the text content from MCP content array
@@ -168,8 +191,14 @@ impl McpClient {
 
         // Parse the inner JSON payload returned by our EmployeeService
         let inner: Value = serde_json::from_str(&raw_text).unwrap_or(Value::Null);
-        let success = inner.get("success").and_then(|v| v.as_bool()).unwrap_or(!is_error);
-        let message = inner.get("message").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let success = inner
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(!is_error);
+        let message = inner
+            .get("message")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let data = inner.get("data").cloned();
 
         Ok(ToolExecutionResult {
@@ -191,17 +220,23 @@ impl McpClient {
 
     async fn read_response(&mut self) -> Result<JsonRpcResponse> {
         let line = self.process.read_line(self.timeout_secs).await?;
-        let resp: JsonRpcResponse = serde_json::from_str(&line)
-            .map_err(|e| McpError::Protocol(format!("Failed to parse JSON-RPC response: {}. Raw: {}", e, line)))?;
+        let resp: JsonRpcResponse = serde_json::from_str(&line).map_err(|e| {
+            McpError::Protocol(format!(
+                "Failed to parse JSON-RPC response: {}. Raw: {}",
+                e, line
+            ))
+        })?;
         Ok(resp)
     }
 
     pub fn tool_names(&self) -> Vec<String> {
-        self.discovered_tools.iter().map(|t| t.name.clone()).collect()
+        self.discovered_tools
+            .iter()
+            .map(|t| t.name.clone())
+            .collect()
     }
 
     pub async fn shutdown(&mut self) {
         self.process.shutdown().await;
     }
 }
-

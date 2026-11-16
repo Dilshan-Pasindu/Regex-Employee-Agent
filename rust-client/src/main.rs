@@ -16,15 +16,21 @@
 use employee_mcp_client::{
     config::Config,
     confirmation::request_confirmation,
+    context::{
+        ResolvedContextAction, clear_session_context, get_or_create_context, resolve_context,
+        update_context,
+    },
     intent::detector::detect_intent,
     intent::patterns::{RE_EXIT, RE_HELP},
     mcp::client::McpClient,
     models::{Intent, IntentResult, ToolExecutionResult},
-    server::{build_router, AppState},
+    planner::{create_execution_plan, execute_plan, project_fields, validate_plan},
+    response::formatter::format_mcp_data,
+    server::{AppState, build_router},
+    suggestions::generate_suggestions,
 };
 
-use axum;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{self, BufRead, Write};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -37,7 +43,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
                 .add_directive("employee_mcp_client=info".parse()?)
-                .add_directive("warn".parse()?)
+                .add_directive("warn".parse()?),
         )
         .init();
 
@@ -54,13 +60,18 @@ async fn main() -> anyhow::Result<()> {
     eprintln!("  Starting .NET MCP Server...");
     let client = match McpClient::connect(&config).await {
         Ok(c) => {
-            eprintln!("  ✓ MCP Server connected. {} tools discovered.", c.discovered_tools.len());
+            eprintln!(
+                "  ✓ MCP Server connected. {} tools discovered.",
+                c.discovered_tools.len()
+            );
             eprintln!("  ✓ Tools: {}", c.tool_names().join(", "));
             c
         }
         Err(e) => {
             eprintln!("  ✗ Failed to connect to MCP Server: {}", e);
-            eprintln!("  Make sure you have run 'dotnet build' in dotnet-mcp-server/EmployeeMcpServer");
+            eprintln!(
+                "  Make sure you have run 'dotnet build' in dotnet-mcp-server/EmployeeMcpServer"
+            );
             eprintln!("  and that your MySQL connection string in appsettings.json is correct.");
             return Err(e.into());
         }
@@ -81,9 +92,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // -------------------------------------------------------------------------
-    // Interactive CLI mode (original Phase 2 behaviour)
+    // Interactive CLI mode with Context, Planner, and Suggestions
     // -------------------------------------------------------------------------
     let mut client = client;
+    let cli_session = "cli_session";
 
     let stdin = io::stdin();
     loop {
@@ -100,59 +112,99 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        let prompt = line.trim().to_string();
-        if prompt.is_empty() {
+        let raw_prompt = line.trim().to_string();
+        if raw_prompt.is_empty() {
             continue;
         }
 
         // Exit commands
-        if RE_EXIT.is_match(&prompt) {
+        if RE_EXIT.is_match(&raw_prompt) {
             println!("Goodbye!");
             break;
         }
 
         // Help command
-        if RE_HELP.is_match(&prompt) {
+        if RE_HELP.is_match(&raw_prompt) {
             print_help();
             continue;
         }
 
-        // Detect intent deterministically via Regex
-        let intent_result = detect_intent(&prompt);
+        let mut context = get_or_create_context(cli_session);
 
-        match &intent_result.intent {
-            Intent::Unknown(text) => {
-                if text == "exit" { break; }
-                println!("  ✗ I didn't understand that prompt.");
-                println!("    Supported commands: show/list/find/add/update employees, count, departments.");
-                println!("    Type 'help' for examples.");
+        // Stage 1: Context Resolution
+        let context_action = resolve_context(&raw_prompt, &context);
+        let prompt = match context_action {
+            ResolvedContextAction::ContextCleared => {
+                clear_session_context(cli_session);
+                println!("  ✓ Conversation memory has been cleared.");
                 continue;
             }
-            _ => {}
+            ResolvedContextAction::InMemoryProjection { requested_fields } => {
+                if let Some(ref data) = context.last_result_data {
+                    let projected = project_fields(data, &requested_fields);
+                    println!("{}", format_mcp_data(&projected));
+                    context.last_requested_fields = requested_fields;
+                    update_context(cli_session, context);
+                    continue;
+                }
+                raw_prompt
+            }
+            ResolvedContextAction::EmployeeFollowUp {
+                rewritten_prompt, ..
+            } => {
+                println!("  [Context Resolved] → {}", rewritten_prompt);
+                rewritten_prompt
+            }
+            ResolvedContextAction::DepartmentSwitch {
+                rewritten_prompt, ..
+            } => {
+                println!("  [Context Resolved] → {}", rewritten_prompt);
+                rewritten_prompt
+            }
+            ResolvedContextAction::None => raw_prompt,
+        };
+
+        // Stage 2: Intent Detection
+        let intent_result = detect_intent(&prompt);
+
+        if matches!(intent_result.intent, Intent::Unknown(_)) {
+            let suggestions_out = generate_suggestions(&prompt, &intent_result, &context);
+            println!("  ✗ {}", suggestions_out.explanation);
+            if !suggestions_out.suggestions.is_empty() {
+                println!("    Suggested prompts:");
+                for s in suggestions_out.suggestions {
+                    println!("      • {}", s);
+                }
+            }
+            context.record_failure();
+            update_context(cli_session, context);
+            continue;
         }
 
         println!("  → Intent : {:?}", intent_result.intent);
 
-        let tool_name = match intent_result.intent.tool_name() {
-            Some(t) => t.to_string(),
-            None => {
-                println!("  ✗ No tool mapped for this intent.");
-                continue;
+        // Stage 3: Task Planning & Validation
+        let plan = create_execution_plan(&prompt, &intent_result);
+        let validation = validate_plan(&plan, &intent_result, &client.discovered_tools);
+        if !validation.is_valid {
+            println!("  ✗ Plan validation failed:");
+            for err in validation.errors {
+                println!("    - {}", err);
             }
-        };
-
-        // Build tool arguments from extracted parameters
-        let args = match build_tool_args(&intent_result) {
-            Ok(a) => a,
-            Err(msg) => {
-                println!("  ✗ Missing information: {}", msg);
-                println!("    Please provide more details and try again.");
-                continue;
+            let suggestions_out = generate_suggestions(&prompt, &intent_result, &context);
+            if !suggestions_out.suggestions.is_empty() {
+                println!("    Suggested prompts:");
+                for s in suggestions_out.suggestions {
+                    println!("      • {}", s);
+                }
             }
-        };
+            context.record_failure();
+            update_context(cli_session, context);
+            continue;
+        }
 
         // Confirmation gate for write operations
-        if intent_result.intent.requires_confirmation() {
+        if plan.requires_confirmation {
             let confirmed = request_confirmation(&intent_result);
             if !confirmed {
                 println!("  ✗ Operation cancelled.");
@@ -160,14 +212,94 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        // Execute the MCP tool
-        println!("  → Calling tool: {} ...", tool_name);
-        match client.call_tool(&tool_name, args).await {
-            Ok(result) => {
-                display_result(&result, &intent_result.params.requested_fields);
+        // Stage 4: Execution Engine
+        println!("  → Executing task plan ({} steps)...", plan.steps.len());
+        match execute_plan(&plan, &mut client).await {
+            Ok(outcome) => {
+                if outcome.success {
+                    if let Some(ref data) = outcome.data {
+                        println!("{}", format_mcp_data(data));
+                    } else if let Some(ref msg) = outcome.message {
+                        println!("  ✓ {}", msg);
+                    }
+
+                    // Update context
+                    match intent_result.intent {
+                        Intent::GetEmployeeById => {
+                            let emp_id = plan.extracted_conditions.employee_id.unwrap_or(0);
+                            let name = outcome.data.as_ref().and_then(|d| {
+                                if let (Some(f), Some(l)) = (
+                                    d.get("firstName").and_then(|v| v.as_str()),
+                                    d.get("lastName").and_then(|v| v.as_str()),
+                                ) {
+                                    Some(format!("{} {}", f, l))
+                                } else {
+                                    None
+                                }
+                            });
+                            let email = outcome
+                                .data
+                                .as_ref()
+                                .and_then(|d| d.get("email").and_then(|v| v.as_str()))
+                                .map(|s| s.to_string());
+                            let dept = outcome
+                                .data
+                                .as_ref()
+                                .and_then(|d| d.get("departmentName").and_then(|v| v.as_str()))
+                                .map(|s| s.to_string());
+                            let desig = outcome
+                                .data
+                                .as_ref()
+                                .and_then(|d| d.get("designationName").and_then(|v| v.as_str()))
+                                .map(|s| s.to_string());
+                            let salary = outcome
+                                .data
+                                .as_ref()
+                                .and_then(|d| d.get("salary").and_then(|v| v.as_f64()));
+                            let status = outcome
+                                .data
+                                .as_ref()
+                                .and_then(|d| d.get("status").and_then(|v| v.as_str()))
+                                .map(|s| s.to_string());
+
+                            context.record_employee_lookup(
+                                emp_id,
+                                name,
+                                email,
+                                dept,
+                                desig,
+                                salary,
+                                status,
+                                outcome.data.clone(),
+                            );
+                        }
+                        Intent::SearchEmployees | Intent::GetAllEmployees => {
+                            context.record_search(
+                                plan.extracted_conditions.department.clone(),
+                                plan.extracted_conditions.designation.clone(),
+                                plan.extracted_conditions.status.clone(),
+                                outcome.data.clone(),
+                                outcome.matching_count,
+                            );
+                        }
+                        _ => {}
+                    }
+                    update_context(cli_session, context);
+                } else {
+                    println!(
+                        "  ✗ {}",
+                        outcome
+                            .message
+                            .unwrap_or_else(|| "Operation failed".to_string())
+                    );
+                    context.record_failure();
+                    update_context(cli_session, context);
+                }
             }
             Err(e) => {
-                println!("  ✗ Error: {}", e);
+                println!("  ✗ Plan execution error: {}", e);
+                context.record_failure();
+                update_context(cli_session, context);
             }
         }
     }
@@ -180,12 +312,14 @@ async fn main() -> anyhow::Result<()> {
 // Build MCP tool arguments from extracted parameters
 // Returns Err with a helpful message if required params are missing.
 // =============================================================================
+#[allow(dead_code)]
 fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
     let p = &intent.params;
     match &intent.intent {
-
         Intent::GetEmployeeById => {
-            let id = p.employee_id.ok_or("Employee ID is required. Example: 'Find employee 1001'")?;
+            let id = p
+                .employee_id
+                .ok_or("Employee ID is required. Example: 'Find employee 1001'")?;
             Ok(json!({ "employeeId": id }))
         }
 
@@ -210,7 +344,10 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
                 args.insert("status".to_string(), json!(status));
             }
             if args.is_empty() {
-                return Err("Please specify a filter. Example: 'Search employees in IT' or 'Find John'".to_string());
+                return Err(
+                    "Please specify a filter. Example: 'Search employees in IT' or 'Find John'"
+                        .to_string(),
+                );
             }
             Ok(Value::Object(args))
         }
@@ -227,9 +364,18 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
         }
 
         Intent::AddEmployee => {
-            let first = p.first_name.as_deref().ok_or("First name is required for adding an employee.")?;
-            let last  = p.last_name.as_deref().ok_or("Last name is required for adding an employee.")?;
-            let email = p.email.as_deref().ok_or("Email is required. Example: john.smith@example.com")?;
+            let first = p
+                .first_name
+                .as_deref()
+                .ok_or("First name is required for adding an employee.")?;
+            let last = p
+                .last_name
+                .as_deref()
+                .ok_or("Last name is required for adding an employee.")?;
+            let email = p
+                .email
+                .as_deref()
+                .ok_or("Email is required. Example: john.smith@example.com")?;
 
             let args = json!({
                 "firstName": first,
@@ -249,7 +395,9 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
             // We surface a helpful error rather than silently passing 0.
             if p.department_name.is_some() || p.designation_name.is_some() {
                 println!("  ℹ  Department/Designation specified by name.");
-                println!("     The .NET server requires IDs. Use 'show departments' and 'show designations' first.");
+                println!(
+                    "     The .NET server requires IDs. Use 'show departments' and 'show designations' first."
+                );
                 println!("     Then re-run: add employee ... departmentId 1 designationId 1");
             }
 
@@ -257,18 +405,34 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
         }
 
         Intent::UpdateEmployee => {
-            let id = p.employee_id.ok_or("Employee ID is required. Example: 'Update employee 1001 status to Inactive'")?;
+            let id = p.employee_id.ok_or(
+                "Employee ID is required. Example: 'Update employee 1001 status to Inactive'",
+            )?;
 
             let mut args = serde_json::Map::new();
             args.insert("employeeId".to_string(), json!(id));
 
-            if let Some(ref f) = p.first_name       { args.insert("firstName".to_string(), json!(f)); }
-            if let Some(ref l) = p.last_name        { args.insert("lastName".to_string(), json!(l)); }
-            if let Some(ref e) = p.email            { args.insert("email".to_string(), json!(e)); }
-            if let Some(ref ph) = p.phone           { args.insert("phone".to_string(), json!(ph)); }
-            if let Some(ref st) = p.status          { args.insert("status".to_string(), json!(st)); }
-            if let Some(salary) = p.salary          { args.insert("salary".to_string(), json!(salary)); }
-            if let Some(ref date) = p.hire_date     { args.insert("hireDate".to_string(), json!(date)); }
+            if let Some(ref f) = p.first_name {
+                args.insert("firstName".to_string(), json!(f));
+            }
+            if let Some(ref l) = p.last_name {
+                args.insert("lastName".to_string(), json!(l));
+            }
+            if let Some(ref e) = p.email {
+                args.insert("email".to_string(), json!(e));
+            }
+            if let Some(ref ph) = p.phone {
+                args.insert("phone".to_string(), json!(ph));
+            }
+            if let Some(ref st) = p.status {
+                args.insert("status".to_string(), json!(st));
+            }
+            if let Some(salary) = p.salary {
+                args.insert("salary".to_string(), json!(salary));
+            }
+            if let Some(ref date) = p.hire_date {
+                args.insert("hireDate".to_string(), json!(date));
+            }
 
             if args.len() == 1 {
                 return Err(
@@ -292,19 +456,38 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
 // Pretty-print tool results to the terminal
 // Supports selective field projection when the user requests specific fields
 // =============================================================================
+#[allow(dead_code)]
 fn display_result(result: &ToolExecutionResult, requested_fields: &[String]) {
     println!();
     if result.success {
-        println!("  ✓ Success{}", result.message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default());
+        println!(
+            "  ✓ Success{}",
+            result
+                .message
+                .as_ref()
+                .map(|m| format!(": {}", m))
+                .unwrap_or_default()
+        );
     } else {
-        println!("  ✗ Error{}", result.message.as_ref().map(|m| format!(": {}", m)).unwrap_or_default());
+        println!(
+            "  ✗ Error{}",
+            result
+                .message
+                .as_ref()
+                .map(|m| format!(": {}", m))
+                .unwrap_or_default()
+        );
     }
 
     if let Some(ref data) = result.data {
         println!();
         match data {
             Value::Array(rows) => {
-                println!("  Results ({} row{}):", rows.len(), if rows.len() == 1 { "" } else { "s" });
+                println!(
+                    "  Results ({} row{}):",
+                    rows.len(),
+                    if rows.len() == 1 { "" } else { "s" }
+                );
                 for (i, row) in rows.iter().enumerate() {
                     println!("  [{:>2}] {}", i + 1, format_row(row, requested_fields));
                 }
@@ -363,9 +546,9 @@ fn format_field_value(v: &Value) -> String {
     match v {
         Value::String(s) => s.clone(),
         Value::Number(n) => n.to_string(),
-        Value::Bool(b)   => b.to_string(),
-        Value::Null      => "—".to_string(),
-        other            => other.to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Null => "—".to_string(),
+        other => other.to_string(),
     }
 }
 

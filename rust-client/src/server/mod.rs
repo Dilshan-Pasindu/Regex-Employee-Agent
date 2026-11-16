@@ -15,21 +15,27 @@
 use std::sync::Arc;
 
 use axum::{
+    Json, Router,
     extract::State,
     http::{Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
-    Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::{
+    context::{
+        ResolvedContextAction, clear_session_context, get_or_create_context, resolve_context,
+        update_context,
+    },
     intent::detector::detect_intent,
     mcp::client::McpClient,
     models::{Intent, IntentResult},
+    planner::{create_execution_plan, execute_plan, project_fields, validate_plan},
+    suggestions::generate_suggestions,
 };
 
 // ---------------------------------------------------------------------------
@@ -48,6 +54,8 @@ pub struct ProcessRequest {
     pub prompt: String,
     #[serde(default)]
     pub confirmed: bool,
+    #[serde(default)]
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -70,6 +78,10 @@ pub struct ProcessResponse {
     pub requires_confirmation: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution_plan: Option<Value>,
 }
 
 // ---------------------------------------------------------------------------
@@ -131,19 +143,85 @@ async fn process_handler(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ProcessRequest>,
 ) -> Result<impl IntoResponse, (StatusCode, Json<Value>)> {
-    let prompt = req.prompt.trim().to_string();
-    if prompt.is_empty() {
+    let raw_prompt = req.prompt.trim().to_string();
+    if raw_prompt.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(json!({"error": "prompt cannot be empty"})),
         ));
     }
 
-    // Step 1 — Intent detection
-    let intent_result: IntentResult = detect_intent(&prompt);
+    let session_id = req.session_id.unwrap_or_else(|| "default".to_string());
+    let mut context = get_or_create_context(&session_id);
 
+    // -----------------------------------------------------------------------
+    // Stage 1: Conversational Context Resolution
+    // -----------------------------------------------------------------------
+    let context_action = resolve_context(&raw_prompt, &context);
+    let prompt = match context_action {
+        ResolvedContextAction::ContextCleared => {
+            clear_session_context(&session_id);
+            return Ok(Json(ProcessResponse {
+                prompt: raw_prompt,
+                intent: "clear_context".to_string(),
+                tool: None,
+                params: json!({}),
+                steps: vec![Step {
+                    step: 1,
+                    label: "Context Cleared".into(),
+                    value: json!("Conversation memory reset"),
+                }],
+                result: None,
+                success: true,
+                requires_confirmation: None,
+                message: Some("Conversation context has been cleared.".to_string()),
+                suggestions: None,
+                execution_plan: None,
+            }));
+        }
+        ResolvedContextAction::InMemoryProjection { requested_fields } => {
+            if let Some(ref data) = context.last_result_data {
+                let projected = project_fields(data, &requested_fields);
+                context.last_requested_fields = requested_fields.clone();
+                update_context(&session_id, context);
+
+                return Ok(Json(ProcessResponse {
+                    prompt: raw_prompt,
+                    intent: "filter_previous_result".to_string(),
+                    tool: None,
+                    params: json!({ "requestedFields": requested_fields }),
+                    steps: vec![Step {
+                        step: 1,
+                        label: "In-Memory Projection".into(),
+                        value: json!(requested_fields),
+                    }],
+                    result: Some(projected),
+                    success: true,
+                    requires_confirmation: None,
+                    message: Some(format!(
+                        "Filtered previous search results to {}.",
+                        requested_fields.join(", ")
+                    )),
+                    suggestions: None,
+                    execution_plan: None,
+                }));
+            }
+            raw_prompt
+        }
+        ResolvedContextAction::EmployeeFollowUp {
+            rewritten_prompt, ..
+        } => rewritten_prompt,
+        ResolvedContextAction::DepartmentSwitch {
+            rewritten_prompt, ..
+        } => rewritten_prompt,
+        ResolvedContextAction::None => raw_prompt,
+    };
+
+    // -----------------------------------------------------------------------
+    // Stage 2: Intent Detection & Parameter Extraction
+    // -----------------------------------------------------------------------
+    let intent_result: IntentResult = detect_intent(&prompt);
     let intent_name = intent_label(&intent_result.intent);
-    let tool_name = intent_result.intent.tool_name().map(|s| s.to_string());
 
     let mut steps: Vec<Step> = Vec::new();
     steps.push(Step {
@@ -152,7 +230,6 @@ async fn process_handler(
         value: json!(intent_name),
     });
 
-    // Build params JSON for transparency
     let params_json = params_to_json(&intent_result);
     steps.push(Step {
         step: 2,
@@ -160,8 +237,14 @@ async fn process_handler(
         value: params_json.clone(),
     });
 
-    // Unknown intent → return early
+    // -----------------------------------------------------------------------
+    // Stage 3: Prompt Suggestion & Recovery for Invalid/Unknown Prompts
+    // -----------------------------------------------------------------------
     if matches!(intent_result.intent, Intent::Unknown(_)) {
+        let suggestion_out = generate_suggestions(&prompt, &intent_result, &context);
+        context.record_failure();
+        update_context(&session_id, context);
+
         return Ok(Json(ProcessResponse {
             prompt,
             intent: intent_name,
@@ -171,16 +254,41 @@ async fn process_handler(
             result: None,
             success: false,
             requires_confirmation: None,
-            message: Some(
-                "I didn't understand that prompt. Try: 'show all employees', 'find employee 1001', \
-                 'add employee...', 'update employee 1001...', 'count employees', 'show departments'."
-                    .to_string(),
-            ),
+            message: Some(suggestion_out.explanation),
+            suggestions: Some(suggestion_out.suggestions),
+            execution_plan: None,
+        }));
+    }
+
+    // -----------------------------------------------------------------------
+    // Stage 4: Multi-Step Task Planning & Validation
+    // -----------------------------------------------------------------------
+    let plan = create_execution_plan(&prompt, &intent_result);
+
+    let mut client = state.client.lock().await;
+    let validation = validate_plan(&plan, &intent_result, &client.discovered_tools);
+    if !validation.is_valid {
+        let suggestion_out = generate_suggestions(&prompt, &intent_result, &context);
+        context.record_failure();
+        update_context(&session_id, context);
+
+        return Ok(Json(ProcessResponse {
+            prompt,
+            intent: intent_name,
+            tool: None,
+            params: params_json,
+            steps,
+            result: None,
+            success: false,
+            requires_confirmation: None,
+            message: Some(validation.errors.join("; ")),
+            suggestions: Some(suggestion_out.suggestions),
+            execution_plan: Some(json!(plan)),
         }));
     }
 
     // Write operations — confirmation gate
-    if intent_result.intent.requires_confirmation() && !req.confirmed {
+    if plan.requires_confirmation && !req.confirmed {
         steps.push(Step {
             step: 3,
             label: "Awaiting Confirmation".to_string(),
@@ -190,83 +298,129 @@ async fn process_handler(
         return Ok(Json(ProcessResponse {
             prompt,
             intent: intent_name,
-            tool: tool_name,
+            tool: intent_result.intent.tool_name().map(|s| s.to_string()),
             params: params_json,
             steps,
             result: None,
             success: false,
             requires_confirmation: Some(true),
             message: Some("Please confirm this write operation.".to_string()),
+            suggestions: None,
+            execution_plan: Some(json!(plan)),
         }));
     }
 
-    // Step 3 — build tool args
-    let Some(ref tool) = tool_name else {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({"error": "No tool mapped for this intent"})),
-        ));
-    };
+    // -----------------------------------------------------------------------
+    // Stage 5: Execution Engine (MCP over STDIO + Post-Filtering + Projection)
+    // -----------------------------------------------------------------------
+    for p_step in &plan.steps {
+        steps.push(Step {
+            step: (steps.len() + 1) as u32,
+            label: format!("Execution Step {}", p_step.step_number),
+            value: json!(p_step.description),
+        });
+    }
 
-    let args = build_tool_args_json(&intent_result).map_err(|msg| {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({"error": msg})),
-        )
-    })?;
-
-    steps.push(Step {
-        step: 3,
-        label: "MCP Tool Dispatched".to_string(),
-        value: json!(tool),
-    });
-
-    // Step 4 — call MCP tool
-    let requested_fields = intent_result.params.requested_fields.clone();
-    let mut client = state.client.lock().await;
-    match client.call_tool(tool, args).await {
-        Ok(exec_result) => {
+    match execute_plan(&plan, &mut client).await {
+        Ok(outcome) => {
             steps.push(Step {
-                step: 4,
+                step: (steps.len() + 1) as u32,
                 label: "Result Received".to_string(),
-                value: json!(if exec_result.success { "200 OK" } else { "Error" }),
+                value: json!(if outcome.success { "200 OK" } else { "Error" }),
             });
 
-            // Apply selective field projection — same logic as the CLI display_result()
-            let projected = exec_result.data.map(|data| project_fields(data, &requested_fields));
+            if outcome.success {
+                // Update conversational memory
+                match intent_result.intent {
+                    Intent::GetEmployeeById => {
+                        let emp_id = plan.extracted_conditions.employee_id.unwrap_or(0);
+                        let name = outcome.data.as_ref().and_then(|d| {
+                            if let (Some(f), Some(l)) = (
+                                d.get("firstName").and_then(|v| v.as_str()),
+                                d.get("lastName").and_then(|v| v.as_str()),
+                            ) {
+                                Some(format!("{} {}", f, l))
+                            } else {
+                                None
+                            }
+                        });
+                        let email = outcome
+                            .data
+                            .as_ref()
+                            .and_then(|d| d.get("email").and_then(|v| v.as_str()))
+                            .map(|s| s.to_string());
+                        let dept = outcome
+                            .data
+                            .as_ref()
+                            .and_then(|d| d.get("departmentName").and_then(|v| v.as_str()))
+                            .map(|s| s.to_string());
+                        let desig = outcome
+                            .data
+                            .as_ref()
+                            .and_then(|d| d.get("designationName").and_then(|v| v.as_str()))
+                            .map(|s| s.to_string());
+                        let salary = outcome
+                            .data
+                            .as_ref()
+                            .and_then(|d| d.get("salary").and_then(|v| v.as_f64()));
+                        let status = outcome
+                            .data
+                            .as_ref()
+                            .and_then(|d| d.get("status").and_then(|v| v.as_str()))
+                            .map(|s| s.to_string());
+
+                        context.record_employee_lookup(
+                            emp_id,
+                            name,
+                            email,
+                            dept,
+                            desig,
+                            salary,
+                            status,
+                            outcome.data.clone(),
+                        );
+                    }
+                    Intent::SearchEmployees | Intent::GetAllEmployees => {
+                        context.record_search(
+                            plan.extracted_conditions.department.clone(),
+                            plan.extracted_conditions.designation.clone(),
+                            plan.extracted_conditions.status.clone(),
+                            outcome.data.clone(),
+                            outcome.matching_count,
+                        );
+                    }
+                    _ => {}
+                }
+                update_context(&session_id, context);
+            } else {
+                context.record_failure();
+                update_context(&session_id, context);
+            }
 
             Ok(Json(ProcessResponse {
                 prompt,
                 intent: intent_name,
-                tool: Some(tool.clone()),
+                tool: intent_result.intent.tool_name().map(|s| s.to_string()),
                 params: params_json,
                 steps,
-                result: projected.or_else(|| {
-                    exec_result.message.as_ref().map(|m| json!({"message": m}))
-                }),
-                success: exec_result.success,
+                result: outcome
+                    .data
+                    .or_else(|| outcome.message.as_ref().map(|m| json!({ "message": m }))),
+                success: outcome.success,
                 requires_confirmation: None,
-                message: exec_result.message,
+                message: outcome.message,
+                suggestions: None,
+                execution_plan: Some(json!(plan)),
             }))
         }
         Err(e) => {
-            steps.push(Step {
-                step: 4,
-                label: "Error".to_string(),
-                value: json!(e.to_string()),
-            });
+            context.record_failure();
+            update_context(&session_id, context);
 
-            Ok(Json(ProcessResponse {
-                prompt,
-                intent: intent_name,
-                tool: Some(tool.clone()),
-                params: params_json,
-                steps,
-                result: None,
-                success: false,
-                requires_confirmation: None,
-                message: Some(e.to_string()),
-            }))
+            Err((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({ "error": format!("Plan execution failed: {}", e) })),
+            ))
         }
     }
 }
@@ -277,45 +431,74 @@ async fn process_handler(
 
 fn intent_label(intent: &Intent) -> String {
     match intent {
-        Intent::GetAllEmployees    => "get_all_employees".to_string(),
-        Intent::GetEmployeeById    => "get_employee_by_id".to_string(),
-        Intent::SearchEmployees    => "search_employees".to_string(),
-        Intent::GetDepartmentList  => "get_department_list".to_string(),
+        Intent::GetAllEmployees => "get_all_employees".to_string(),
+        Intent::GetEmployeeById => "get_employee_by_id".to_string(),
+        Intent::SearchEmployees => "search_employees".to_string(),
+        Intent::GetDepartmentList => "get_department_list".to_string(),
         Intent::GetDesignationList => "get_designation_list".to_string(),
-        Intent::GetEmployeeCount   => "get_employee_count".to_string(),
-        Intent::AddEmployee        => "add_employee".to_string(),
-        Intent::UpdateEmployee     => "update_employee".to_string(),
-        Intent::Unknown(s)         => format!("unknown({})", s),
+        Intent::GetEmployeeCount => "get_employee_count".to_string(),
+        Intent::AddEmployee => "add_employee".to_string(),
+        Intent::UpdateEmployee => "update_employee".to_string(),
+        Intent::Unknown(s) => format!("unknown({})", s),
     }
 }
 
 fn params_to_json(ir: &IntentResult) -> Value {
     let p = &ir.params;
     let mut obj = serde_json::Map::new();
-    if !p.requested_fields.is_empty() { obj.insert("requestedFields".into(), json!(p.requested_fields)); }
-    if let Some(id) = p.employee_id      { obj.insert("employeeId".into(), json!(id)); }
-    if let Some(ref v) = p.first_name    { obj.insert("firstName".into(), json!(v)); }
-    if let Some(ref v) = p.last_name     { obj.insert("lastName".into(), json!(v)); }
-    if let Some(ref v) = p.email         { obj.insert("email".into(), json!(v)); }
-    if let Some(ref v) = p.phone         { obj.insert("phone".into(), json!(v)); }
-    if let Some(ref v) = p.department_name { obj.insert("departmentName".into(), json!(v)); }
-    if let Some(ref v) = p.designation_name { obj.insert("designationName".into(), json!(v)); }
-    if let Some(v) = p.salary            { obj.insert("salary".into(), json!(v)); }
-    if let Some(ref v) = p.hire_date     { obj.insert("hireDate".into(), json!(v)); }
-    if let Some(ref v) = p.status        { obj.insert("status".into(), json!(v)); }
-    if let Some(ref v) = p.field_to_update { obj.insert("fieldToUpdate".into(), json!(v)); }
-    if let Some(ref v) = p.new_value     { obj.insert("newValue".into(), json!(v)); }
+    if !p.requested_fields.is_empty() {
+        obj.insert("requestedFields".into(), json!(p.requested_fields));
+    }
+    if let Some(id) = p.employee_id {
+        obj.insert("employeeId".into(), json!(id));
+    }
+    if let Some(ref v) = p.first_name {
+        obj.insert("firstName".into(), json!(v));
+    }
+    if let Some(ref v) = p.last_name {
+        obj.insert("lastName".into(), json!(v));
+    }
+    if let Some(ref v) = p.email {
+        obj.insert("email".into(), json!(v));
+    }
+    if let Some(ref v) = p.phone {
+        obj.insert("phone".into(), json!(v));
+    }
+    if let Some(ref v) = p.department_name {
+        obj.insert("departmentName".into(), json!(v));
+    }
+    if let Some(ref v) = p.designation_name {
+        obj.insert("designationName".into(), json!(v));
+    }
+    if let Some(v) = p.salary {
+        obj.insert("salary".into(), json!(v));
+    }
+    if let Some(ref v) = p.hire_date {
+        obj.insert("hireDate".into(), json!(v));
+    }
+    if let Some(ref v) = p.status {
+        obj.insert("status".into(), json!(v));
+    }
+    if let Some(ref v) = p.field_to_update {
+        obj.insert("fieldToUpdate".into(), json!(v));
+    }
+    if let Some(ref v) = p.new_value {
+        obj.insert("newValue".into(), json!(v));
+    }
     Value::Object(obj)
 }
 
 /// Mirror of main.rs build_tool_args, but returns JSON Value directly.
+#[allow(dead_code)]
 fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
     use crate::models::Intent::*;
     let p = &ir.params;
 
     match &ir.intent {
         GetEmployeeById => {
-            let id = p.employee_id.ok_or("Employee ID is required. Example: 'find employee 1001'")?;
+            let id = p
+                .employee_id
+                .ok_or("Employee ID is required. Example: 'find employee 1001'")?;
             Ok(json!({"employeeId": id}))
         }
         GetEmployeeCount => {
@@ -330,19 +513,44 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
         }
         SearchEmployees => {
             let mut args = serde_json::Map::new();
-            if let Some(ref d) = p.department_name  { args.insert("departmentName".into(), json!(d)); }
-            if let Some(ref dg) = p.designation_name { args.insert("designationName".into(), json!(dg)); }
-            if let Some(ref fn_) = p.first_name     { args.insert("firstName".into(), json!(fn_)); }
-            if let Some(ref ln) = p.last_name        { args.insert("lastName".into(), json!(ln)); }
-            if let Some(ref s) = p.status            { args.insert("status".into(), json!(s)); }
+            if let Some(ref d) = p.department_name {
+                args.insert("departmentName".into(), json!(d));
+            }
+            if let Some(ref dg) = p.designation_name {
+                args.insert("designationName".into(), json!(dg));
+            }
+            if let Some(ref fn_) = p.first_name {
+                args.insert("firstName".into(), json!(fn_));
+            }
+            if let Some(ref ln) = p.last_name {
+                args.insert("lastName".into(), json!(ln));
+            }
+            if let Some(ref s) = p.status {
+                args.insert("status".into(), json!(s));
+            }
             Ok(Value::Object(args))
         }
         AddEmployee => {
-            let first = p.first_name.as_deref().ok_or("First name is required for AddEmployee")?;
-            let last  = p.last_name.as_deref().ok_or("Last name is required for AddEmployee")?;
-            let email = p.email.as_deref().ok_or("Email is required for AddEmployee")?;
-            let dept  = p.department_name.as_deref().ok_or("Department is required for AddEmployee")?;
-            let desig = p.designation_name.as_deref().ok_or("Designation is required for AddEmployee")?;
+            let first = p
+                .first_name
+                .as_deref()
+                .ok_or("First name is required for AddEmployee")?;
+            let last = p
+                .last_name
+                .as_deref()
+                .ok_or("Last name is required for AddEmployee")?;
+            let email = p
+                .email
+                .as_deref()
+                .ok_or("Email is required for AddEmployee")?;
+            let dept = p
+                .department_name
+                .as_deref()
+                .ok_or("Department is required for AddEmployee")?;
+            let desig = p
+                .designation_name
+                .as_deref()
+                .ok_or("Designation is required for AddEmployee")?;
 
             let mut args = serde_json::Map::new();
             args.insert("firstName".into(), json!(first));
@@ -350,16 +558,29 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
             args.insert("email".into(), json!(email));
             args.insert("departmentName".into(), json!(dept));
             args.insert("designationName".into(), json!(desig));
-            if let Some(s) = p.salary          { args.insert("salary".into(), json!(s)); }
-            if let Some(ref d) = p.hire_date   { args.insert("hireDate".into(), json!(d)); }
-            if let Some(ref ph) = p.phone      { args.insert("phone".into(), json!(ph)); }
-            if let Some(ref st) = p.status     { args.insert("status".into(), json!(st)); }
+            if let Some(s) = p.salary {
+                args.insert("salary".into(), json!(s));
+            }
+            if let Some(ref d) = p.hire_date {
+                args.insert("hireDate".into(), json!(d));
+            }
+            if let Some(ref ph) = p.phone {
+                args.insert("phone".into(), json!(ph));
+            }
+            if let Some(ref st) = p.status {
+                args.insert("status".into(), json!(st));
+            }
             Ok(Value::Object(args))
         }
         UpdateEmployee => {
-            let id = p.employee_id.ok_or("Employee ID is required for UpdateEmployee")?;
-            let field = p.field_to_update.as_deref().ok_or("Field to update is required")?;
-            let val   = p.new_value.as_deref().ok_or("New value is required")?;
+            let id = p
+                .employee_id
+                .ok_or("Employee ID is required for UpdateEmployee")?;
+            let field = p
+                .field_to_update
+                .as_deref()
+                .ok_or("Field to update is required")?;
+            let val = p.new_value.as_deref().ok_or("New value is required")?;
 
             let field_key = match field.to_lowercase().as_str() {
                 "department" | "departmentname" => "departmentName",
@@ -381,65 +602,5 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
         }
         GetAllEmployees | GetDepartmentList | GetDesignationList => Ok(json!({})),
         Unknown(_) => Ok(json!({})),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Selective field projection — mirrors display_result() in main.rs
-//
-// When the user asks for specific fields (e.g. "find employee 1001 departmentName"),
-// the requested_fields vec is non-empty and we filter the result accordingly.
-// When empty, the full object/array is returned as-is.
-// ---------------------------------------------------------------------------
-fn project_row(obj: &serde_json::Map<String, Value>, requested_fields: &[String]) -> Value {
-    if requested_fields.is_empty() {
-        return Value::Object(obj.clone());
-    }
-
-    let mut out = serde_json::Map::new();
-
-    // Always include employeeId for context (same as CLI)
-    if let Some(id_val) = obj.get("employeeId") {
-        out.insert("employeeId".to_string(), id_val.clone());
-    }
-
-    for rf in requested_fields {
-        if rf.eq_ignore_ascii_case("employeeId") {
-            continue; // already added
-        }
-        // Case-insensitive field lookup
-        if let Some((k, v)) = obj.iter().find(|(k, _)| k.eq_ignore_ascii_case(rf)) {
-            out.insert(k.clone(), v.clone());
-        }
-    }
-
-    // If nothing matched (fields not present in this object), fall back to full row
-    if out.len() <= 1 {
-        return Value::Object(obj.clone());
-    }
-
-    Value::Object(out)
-}
-
-fn project_fields(data: Value, requested_fields: &[String]) -> Value {
-    if requested_fields.is_empty() {
-        return data;
-    }
-    match data {
-        Value::Array(rows) => {
-            let projected: Vec<Value> = rows
-                .into_iter()
-                .map(|row| {
-                    if let Value::Object(ref obj) = row {
-                        project_row(obj, requested_fields)
-                    } else {
-                        row
-                    }
-                })
-                .collect();
-            Value::Array(projected)
-        }
-        Value::Object(ref obj) => project_row(obj, requested_fields),
-        other => other,
     }
 }
