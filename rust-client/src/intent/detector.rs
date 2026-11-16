@@ -21,6 +21,16 @@ pub fn detect_intent(raw_prompt: &str) -> IntentResult {
         };
     }
 
+    // Handle invalid or bare employee lookups (e.g. "find employee abc", "find employee")
+    if is_invalid_employee_id(prompt) || is_bare_employee_lookup(prompt) {
+        return IntentResult {
+            intent: Intent::Unknown(prompt.to_string()),
+            params: Default::default(),
+            confidence: 0,
+            raw_prompt: raw_prompt.to_string(),
+        };
+    }
+
     // --- PRIORITY 1: update_employee ---
     // Must come BEFORE get_employee_by_id so "update employee 1001 ..." is not mistaken for a read lookup
     for re in RE_UPDATE_EMPLOYEE.iter() {

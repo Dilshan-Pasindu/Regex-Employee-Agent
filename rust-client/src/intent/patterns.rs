@@ -73,10 +73,54 @@ pub static RE_SEARCH_EMPLOYEES: Lazy<Vec<Regex>> = Lazy::new(|| {
         Regex::new(&format!(r"(?i)({verbs})\s+(all\s+)?(?P<status>{statuses})\s+employees?")).unwrap(),
         // General search for a name
         Regex::new(r"(?i)(find|search)\s+(?P<name>[A-Za-z]+(?:\s+[A-Za-z]+)?)\s+in\s+employees?").unwrap(),
-        // "search for John" or "find John"
-        Regex::new(r"(?i)^(find|search|look\s+up|lookup)\s+(?P<name>[A-Za-z][A-Za-z\s]+)$").unwrap(),
+        // "search for John"
+        Regex::new(r"(?i)^(?:find|search|look\s*up)\s+for\s+(?P<name>[A-Za-z][A-Za-z\s]+)$").unwrap(),
     ]
 });
+
+// ---------------------------------------------------------------------------
+// Error & Incomplete Prompt Patterns
+// ---------------------------------------------------------------------------
+pub static RE_INVALID_ID: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
+        r"(?i)\b(?:find|show|get|lookup)\s+employee\s+(?:id\s*[:#]?\s*)?(?P<id>[a-zA-Z]{1,15})\b",
+    )
+    .unwrap()
+});
+
+pub static RE_BARE_FIND_EMPLOYEE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)^(find|show|get|search|lookup)\s+(?:an?\s+)?employee\s*(\?|\.)?$").unwrap()
+});
+
+pub fn is_invalid_employee_id(prompt: &str) -> bool {
+    // If the prompt contains a valid numeric employee ID, it is not an invalid ID query
+    if RE_EXTRACT_ID.is_match(prompt) {
+        return false;
+    }
+
+    if let Some(caps) = RE_INVALID_ID.captures(prompt) {
+        if let Some(id_match) = caps.name("id") {
+            let val = id_match.as_str().to_lowercase();
+            if val != "id"
+                && val != "details"
+                && val != "all"
+                && val != "list"
+                && val != "count"
+                && val != "records"
+                && val != "record"
+                && val != "data"
+                && val != "info"
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub fn is_bare_employee_lookup(prompt: &str) -> bool {
+    RE_BARE_FIND_EMPLOYEE.is_match(prompt)
+}
 
 // ---------------------------------------------------------------------------
 // get_department_list patterns

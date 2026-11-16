@@ -12,6 +12,7 @@ use employee_mcp_client::suggestions::{
 fn test_missing_employee_id() {
     let prompt = "Find employee";
     let ir = detect_intent(prompt);
+    assert!(matches!(ir.intent, employee_mcp_client::models::Intent::Unknown(_)));
     let ctx = ConversationContext::new();
 
     let classification = classify_prompt_error(prompt, &ir);
@@ -32,6 +33,7 @@ fn test_missing_employee_id() {
 fn test_invalid_employee_id() {
     let prompt = "Find employee abc";
     let ir = detect_intent(prompt);
+    assert!(matches!(ir.intent, employee_mcp_client::models::Intent::Unknown(_)));
     let ctx = ConversationContext::new();
 
     let classification = classify_prompt_error(prompt, &ir);

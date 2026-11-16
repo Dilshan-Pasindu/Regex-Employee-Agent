@@ -65,6 +65,18 @@ pub fn validate_plan(
                 errors.push("Missing field to update and new value.".to_string());
             }
         }
+        Intent::SearchEmployees => {
+            if plan.extracted_conditions.department.is_none()
+                && plan.extracted_conditions.designation.is_none()
+                && plan.extracted_conditions.status.is_none()
+                && plan.extracted_conditions.salary.is_none()
+                && ir.params.first_name.is_none()
+                && ir.params.last_name.is_none()
+                && ir.params.email.is_none()
+            {
+                errors.push("Search requires at least one filter criterion (e.g. department, designation, status, name, or salary).".to_string());
+            }
+        }
         _ => {}
     }
 
