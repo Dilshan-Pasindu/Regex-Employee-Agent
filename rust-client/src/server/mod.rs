@@ -299,6 +299,76 @@ async fn process_handler(
             value: json!("Write operation requires explicit confirmation before execution."),
         });
 
+        // Special handling for Undo confirmation preview
+        if let Intent::UndoLastUpdate = intent_result.intent {
+            if let Some(ref undo) = context.last_undo {
+                return Ok(Json(ProcessResponse {
+                    prompt,
+                    intent: intent_name,
+                    tool: Some("update_employee".to_string()),
+                    params: params_json,
+                    steps,
+                    result: Some(json!({
+                        "employeeId": undo.employee_id,
+                        "field": undo.field_to_update,
+                        "revertingTo": undo.previous_value,
+                    })),
+                    success: false,
+                    requires_confirmation: Some(true),
+                    message: Some(format!(
+                        "Revert {} for employee {} back to {}?",
+                        undo.field_to_update, undo.employee_id, undo.previous_value
+                    )),
+                    suggestions: None,
+                    execution_plan: Some(json!(plan)),
+                }));
+            } else {
+                return Ok(Json(ProcessResponse {
+                    prompt,
+                    intent: intent_name,
+                    tool: None,
+                    params: params_json,
+                    steps,
+                    result: None,
+                    success: false,
+                    requires_confirmation: None,
+                    message: Some("Nothing to undo: no previous update operations found in this session.".to_string()),
+                    suggestions: None,
+                    execution_plan: None,
+                }));
+            }
+        }
+
+        // Special handling for Batch preview before confirmation
+        if let Intent::BatchUpdate = intent_result.intent {
+            let search_args = if let Some(ref d) = plan.extracted_conditions.designation {
+                json!({ "designationName": d })
+            } else if let Some(ref dept) = plan.extracted_conditions.department {
+                json!({ "departmentName": dept })
+            } else {
+                json!({})
+            };
+            let res = client.call_tool("search_employees", search_args).await;
+            let count = match res {
+                Ok(ref r) => r.data.as_ref().and_then(|d| d.as_array()).map(|a| a.len()).unwrap_or(0),
+                _ => 0,
+            };
+            let preview_data = res.ok().and_then(|r| r.data);
+            return Ok(Json(ProcessResponse {
+                prompt,
+                intent: intent_name,
+                tool: Some("search_employees".to_string()),
+                params: params_json,
+                steps,
+                result: preview_data,
+                success: true,
+                requires_confirmation: Some(true),
+                message: Some(format!("Found {} matching employee(s) for batch operation. Please confirm to apply changes.", count)),
+                suggestions: None,
+                execution_plan: Some(json!(plan)),
+            }));
+        }
+
         return Ok(Json(ProcessResponse {
             prompt,
             intent: intent_name,
@@ -312,6 +382,112 @@ async fn process_handler(
             suggestions: None,
             execution_plan: Some(json!(plan)),
         }));
+    }
+
+    // Capture undo snapshot before executing update_employee
+    if let Intent::UpdateEmployee = intent_result.intent {
+        if let Some(emp_id) = plan.extracted_conditions.employee_id {
+            if let Ok(lookup_res) = client.call_tool("get_employee_by_id", json!({ "employeeId": emp_id })).await {
+                if let Some(emp_obj) = lookup_res.data {
+                    let field = intent_result.params.field_to_update.clone().unwrap_or_else(|| "salary".to_string());
+                    let prev_val = match field.as_str() {
+                        "salary" => emp_obj.get("salary").cloned().unwrap_or(json!(0.0)),
+                        "status" => emp_obj.get("status").cloned().unwrap_or(json!("Active")),
+                        "department" => emp_obj.get("departmentId").cloned().unwrap_or(json!(1)),
+                        _ => json!(null),
+                    };
+                    context.last_undo = Some(crate::context::conversation_context::UndoRecord {
+                        employee_id: emp_id,
+                        field_to_update: field,
+                        previous_value: prev_val,
+                        new_value: json!(intent_result.params.new_value),
+                    });
+                }
+            }
+        }
+    }
+
+    // Execute Undo operation when confirmed
+    if let Intent::UndoLastUpdate = intent_result.intent {
+        if let Some(undo) = context.last_undo.take() {
+            let mut undo_args = serde_json::Map::new();
+            undo_args.insert("employeeId".to_string(), json!(undo.employee_id));
+            if undo.field_to_update == "salary" {
+                if let Some(sal) = undo.previous_value.as_f64() {
+                    undo_args.insert("salary".to_string(), json!(sal));
+                }
+            } else if undo.field_to_update == "status" {
+                if let Some(st) = undo.previous_value.as_str() {
+                    undo_args.insert("status".to_string(), json!(st));
+                }
+            } else if undo.field_to_update == "department" {
+                if let Some(did) = undo.previous_value.as_i64() {
+                    undo_args.insert("departmentId".to_string(), json!(did));
+                }
+            }
+            let res = client.call_tool("update_employee", json!(undo_args)).await;
+            update_context(&session_id, context);
+            return match res {
+                Ok(r) => Ok(Json(ProcessResponse {
+                    prompt,
+                    intent: intent_name,
+                    tool: Some("update_employee".to_string()),
+                    params: params_json,
+                    steps,
+                    result: r.data,
+                    success: r.success,
+                    requires_confirmation: None,
+                    message: Some(format!(
+                        "Successfully reverted {} for employee {} back to {}.",
+                        undo.field_to_update, undo.employee_id, undo.previous_value
+                    )),
+                    suggestions: None,
+                    execution_plan: Some(json!(plan)),
+                })),
+                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+            };
+        }
+    }
+
+    // Execute Batch operation when confirmed
+    if let Intent::BatchUpdate = intent_result.intent {
+        let search_args = if let Some(ref d) = plan.extracted_conditions.designation {
+            json!({ "designationName": d })
+        } else {
+            json!({})
+        };
+        if let Ok(lookup_res) = client.call_tool("search_employees", search_args).await {
+            if let Some(arr) = lookup_res.data.and_then(|d| d.as_array().cloned()) {
+                let mut updated_count = 0;
+                for emp in &arr {
+                    if let Some(id) = emp.get("employeeId").and_then(|v| v.as_i64()) {
+                        if let Some(delta) = plan.extracted_conditions.batch_delta {
+                            let cur_sal = emp.get("salary").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                            let new_sal = cur_sal + delta;
+                            let _ = client.call_tool("update_employee", json!({
+                                "employeeId": id,
+                                "salary": new_sal
+                            })).await;
+                            updated_count += 1;
+                        }
+                    }
+                }
+                update_context(&session_id, context);
+                return Ok(Json(ProcessResponse {
+                    prompt,
+                    intent: intent_name,
+                    tool: Some("update_employee".to_string()),
+                    params: params_json,
+                    steps,
+                    result: Some(json!({ "batchUpdatedCount": updated_count })),
+                    success: true,
+                    requires_confirmation: None,
+                    message: Some(format!("Successfully applied batch update to {} employee(s).", updated_count)),
+                    suggestions: None,
+                    execution_plan: Some(json!(plan)),
+                }));
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -401,6 +577,36 @@ async fn process_handler(
                 update_context(&session_id, context);
             }
 
+            // Multi-result disambiguation suggestions (Feature 2)
+            let disambiguation_suggestions: Option<Vec<String>> = if outcome.success {
+                if let Some(ref d) = outcome.data {
+                    if let Some(arr) = d.as_array() {
+                        if arr.len() > 1 && arr.len() <= 6 {
+                            let chips: Vec<String> = arr.iter().filter_map(|item| {
+                                let id = item.get("employeeId").and_then(|v| v.as_i64())?;
+                                let first = item.get("firstName").and_then(|v| v.as_str()).unwrap_or("");
+                                let last = item.get("lastName").and_then(|v| v.as_str()).unwrap_or("");
+                                let dept = item.get("departmentName").and_then(|v| v.as_str()).unwrap_or("");
+                                Some(format!("Show employee {} ({} {} - {})", id, first, last, dept))
+                            }).collect();
+                            if !chips.is_empty() {
+                                Some(chips)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             Ok(Json(ProcessResponse {
                 prompt,
                 intent: intent_name,
@@ -413,7 +619,7 @@ async fn process_handler(
                 success: outcome.success,
                 requires_confirmation: None,
                 message: outcome.message,
-                suggestions: None,
+                suggestions: disambiguation_suggestions,
                 execution_plan: Some(json!(plan)),
             }))
         }
@@ -443,6 +649,9 @@ fn intent_label(intent: &Intent) -> String {
         Intent::GetEmployeeCount => "get_employee_count".to_string(),
         Intent::AddEmployee => "add_employee".to_string(),
         Intent::UpdateEmployee => "update_employee".to_string(),
+        Intent::CalculateAnalytics => "calculate_analytics".to_string(),
+        Intent::UndoLastUpdate => "undo_last_update".to_string(),
+        Intent::BatchUpdate => "batch_update".to_string(),
         Intent::Unknown(s) => format!("unknown({})", s),
     }
 }
@@ -604,7 +813,7 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
                 "newValue": val,
             }))
         }
-        GetAllEmployees | GetDepartmentList | GetDesignationList => Ok(json!({})),
+        GetAllEmployees | GetDepartmentList | GetDesignationList | CalculateAnalytics | UndoLastUpdate | BatchUpdate => Ok(json!({})),
         Unknown(_) => Ok(json!({})),
     }
 }

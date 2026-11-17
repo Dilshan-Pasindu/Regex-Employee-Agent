@@ -80,6 +80,115 @@ pub async fn execute_plan(
         }
     }
 
+    // Feature 1: Deterministic Statistical Aggregations (Average, Min, Max, Total)
+    if let Some(ref agg_type) = plan.extracted_conditions.aggregation_type {
+        if let Some(ref data) = current_data {
+            if let Some(arr) = data.as_array() {
+                let count = arr.len();
+                if count == 0 {
+                    outcome_msg = Some("No records found to compute statistics.".to_string());
+                } else {
+                    let mut salaries: Vec<(f64, String, i64)> = arr
+                        .iter()
+                        .filter_map(|item| {
+                            let sal = item.get("salary").and_then(|s| s.as_f64())?;
+                            let name = format!(
+                                "{} {}",
+                                item.get("firstName").and_then(|v| v.as_str()).unwrap_or(""),
+                                item.get("lastName").and_then(|v| v.as_str()).unwrap_or("")
+                            )
+                            .trim()
+                            .to_string();
+                            let id = item.get("employeeId").and_then(|v| v.as_i64()).unwrap_or(0);
+                            Some((sal, name, id))
+                        })
+                        .collect();
+
+                    let dept_name = plan
+                        .extracted_conditions
+                        .department
+                        .as_deref()
+                        .unwrap_or("All Departments");
+
+                    match agg_type.as_str() {
+                        "average" => {
+                            let total: f64 = salaries.iter().map(|(s, _, _)| *s).sum();
+                            let avg = if !salaries.is_empty() {
+                                total / salaries.len() as f64
+                            } else {
+                                0.0
+                            };
+                            let msg = format!(
+                                "Average salary in {}: ${:.2} across {} employee(s).",
+                                dept_name, avg, salaries.len()
+                            );
+                            log.push(msg.clone());
+                            outcome_msg = Some(msg);
+                            current_data = Some(serde_json::json!({
+                                "metric": "Average Salary",
+                                "scope": dept_name,
+                                "average_salary": (avg * 100.0).round() / 100.0,
+                                "total_headcount": salaries.len(),
+                            }));
+                        }
+                        "highest" => {
+                            salaries.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                            if let Some((max_sal, name, id)) = salaries.first() {
+                                let msg = format!(
+                                    "Highest paid employee in {}: {} (ID: {}) with salary ${:.2}.",
+                                    dept_name, name, id, max_sal
+                                );
+                                log.push(msg.clone());
+                                outcome_msg = Some(msg);
+                                current_data = Some(serde_json::json!({
+                                    "metric": "Highest Paid",
+                                    "scope": dept_name,
+                                    "employeeId": id,
+                                    "name": name,
+                                    "salary": max_sal,
+                                }));
+                            }
+                        }
+                        "lowest" => {
+                            salaries.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+                            if let Some((min_sal, name, id)) = salaries.first() {
+                                let msg = format!(
+                                    "Lowest paid employee in {}: {} (ID: {}) with salary ${:.2}.",
+                                    dept_name, name, id, min_sal
+                                );
+                                log.push(msg.clone());
+                                outcome_msg = Some(msg);
+                                current_data = Some(serde_json::json!({
+                                    "metric": "Lowest Paid",
+                                    "scope": dept_name,
+                                    "employeeId": id,
+                                    "name": name,
+                                    "salary": min_sal,
+                                }));
+                            }
+                        }
+                        "total" => {
+                            let total: f64 = salaries.iter().map(|(s, _, _)| *s).sum();
+                            let msg = format!(
+                                "Total monthly payroll for {}: ${:.2} ({} employees).",
+                                dept_name, total, salaries.len()
+                            );
+                            log.push(msg.clone());
+                            outcome_msg = Some(msg);
+                            current_data = Some(serde_json::json!({
+                                "metric": "Total Payroll",
+                                "scope": dept_name,
+                                "total_payroll": total,
+                                "total_headcount": salaries.len(),
+                            }));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     // Apply field selection projection if requested
     if !plan.requested_fields.is_empty() {
         if let Some(ref data) = current_data {

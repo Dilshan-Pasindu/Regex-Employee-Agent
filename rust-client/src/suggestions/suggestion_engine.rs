@@ -30,7 +30,7 @@ pub fn generate_suggestions(
         .active_employee_id
         .map(|id| format!("{}", id));
 
-    let raw_suggestions = match classification.error_type {
+    let mut raw_suggestions = match classification.error_type {
         PromptErrorType::UnsupportedOperation => {
             let entity_id = classification
                 .detected_entity
@@ -71,6 +71,18 @@ pub fn generate_suggestions(
         PromptErrorType::UnrelatedPrompt => templates_unrelated(),
         _ => templates_general_fallback(),
     };
+
+    // If a typo autocorrection was proposed, put it as the primary suggestion chip
+    if classification.user_explanation.starts_with("Did you mean: '") {
+        if let Some(start) = classification.user_explanation.find('\'') {
+            if let Some(end) = classification.user_explanation.rfind('\'') {
+                if start < end {
+                    let corrected = classification.user_explanation[start + 1..end].to_string();
+                    raw_suggestions.insert(0, corrected);
+                }
+            }
+        }
+    }
 
     // Deduplicate suggestions and limit to at most 4
     let mut deduplicated: Vec<String> = Vec::new();

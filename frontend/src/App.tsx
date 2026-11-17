@@ -24,7 +24,45 @@ export default function App() {
   const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const toggleVoiceInput = () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const win = window as any;
+    const SpeechRecognition = win.SpeechRecognition || win.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "en-US";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(prev => (prev ? `${prev} ${transcript}` : transcript));
+      };
+
+      recognition.start();
+    } catch (err) {
+      console.error("Speech recognition error:", err);
+      setIsListening(false);
+    }
+  };
 
   // Sync dark-mode token on <html>
   useEffect(() => {
@@ -309,6 +347,28 @@ export default function App() {
               opacity: loading ? 0.5 : 1,
             }}
           />
+          <button
+            type="button"
+            onClick={toggleVoiceInput}
+            aria-label="Voice input"
+            title={isListening ? "Listening... click to stop" : "Voice input (dictate prompt)"}
+            style={{
+              background: isListening ? '#dc2626' : 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 12,
+              padding: '6px 12px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              color: isListening ? '#fff' : 'var(--text)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              animation: isListening ? 'pulse 1.5s infinite' : 'none',
+            }}
+          >
+            {isListening ? '⏹️ Rec' : '🎙️'}
+          </button>
           <button
             onClick={handleSend}
             disabled={loading || !input.trim()}

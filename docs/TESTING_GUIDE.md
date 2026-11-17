@@ -17,11 +17,12 @@ cargo test
 
 | Test File | Total Tests | Focus Area |
 |---|---|---|
-| `tests/regex_tests.rs` | 49 | Core intent detection, parameters, projection, precedence |
+| `tests/regex_tests.rs` | 57 | Core intent detection, parameters, projection, analytics, batch, undo |
 | `tests/context_tests.rs` | 9 | Pronoun resolution, follow-up queries, session isolation |
-| `tests/planner_tests.rs` | 6 | Multi-step plans, salary comparison, field projection, validation |
-| `tests/suggestion_tests.rs` | 8 | Error classification, entity-preserving recovery, templates |
-| **Total Unit Tests** | **72** | **100% Passing** |
+| `tests/planner_tests.rs` | 8 | Multi-step plans, salary comparison, field projection, validation |
+| `tests/suggestion_tests.rs` | 9 | Error classification, entity-preserving recovery, templates |
+| `src/intent/fuzzy.rs` | 2 | Levenshtein distance & typo autocorrection |
+| **Total Unit Tests** | **85** | **100% Passing** |
 
 ---
 

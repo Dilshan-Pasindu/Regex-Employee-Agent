@@ -22,6 +22,7 @@ interface Props {
 export function EmployeeTable({ data }: Props) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [asc, setAsc] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   const rows: Row[] = Array.isArray(data)
     ? (data as Row[])
@@ -32,6 +33,31 @@ export function EmployeeTable({ data }: Props) {
   if (rows.length === 0) return null;
 
   const keys = Object.keys(rows[0]);
+
+  function copyAsTsv() {
+    const header = keys.join('\t');
+    const body = rows.map(r => keys.map(k => String(r[k] ?? '')).join('\t')).join('\n');
+    navigator.clipboard.writeText(`${header}\n${body}`).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  function downloadCsv() {
+    const escapeCsv = (val: unknown) => {
+      const s = String(val ?? '').replace(/"/g, '""');
+      return `"${s}"`;
+    };
+    const header = keys.map(escapeCsv).join(',');
+    const body = rows.map(r => keys.map(k => escapeCsv(r[k])).join(',')).join('\n');
+    const blob = new Blob([`${header}\n${body}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `employees_export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   const sorted = sortKey
     ? [...rows].sort((a, b) => {
@@ -69,12 +95,65 @@ export function EmployeeTable({ data }: Props) {
 
   return (
     <div style={{
-      overflowX: 'auto',
       marginTop: 10,
       borderRadius: 12,
       border: '1px solid var(--border)',
       boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+      overflow: 'hidden',
     }}>
+      {/* Action Bar for Export (CSV / TSV) */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '6px 12px',
+        background: 'var(--surface-2)',
+        borderBottom: '1px solid var(--border)',
+        fontSize: '0.72rem',
+      }}>
+        <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>
+          {rows.length} record{rows.length !== 1 ? 's' : ''}
+        </span>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button
+            onClick={copyAsTsv}
+            title="Copy as TSV (paste into Excel/Sheets)"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '3px 8px',
+              fontSize: '0.7rem',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            📋 {copied ? 'Copied TSV!' : 'Copy TSV'}
+          </button>
+          <button
+            onClick={downloadCsv}
+            title="Download CSV spreadsheet"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border)',
+              borderRadius: 6,
+              padding: '3px 8px',
+              fontSize: '0.7rem',
+              color: 'var(--text)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            📥 Export CSV
+          </button>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
         <thead>
           <tr style={{
@@ -123,6 +202,7 @@ export function EmployeeTable({ data }: Props) {
           ))}
         </tbody>
       </table>
+      </div>
       <div style={{
         padding: '5px 12px',
         fontSize: '0.68rem',

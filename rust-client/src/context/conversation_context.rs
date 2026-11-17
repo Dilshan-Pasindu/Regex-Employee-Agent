@@ -12,6 +12,15 @@ use std::sync::{Arc, Mutex};
 pub static SESSION_STORE: Lazy<Arc<Mutex<HashMap<String, ConversationContext>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
+/// Undo stack record storing prior state for reversible mutations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UndoRecord {
+    pub employee_id: i64,
+    pub field_to_update: String,
+    pub previous_value: Value,
+    pub new_value: Value,
+}
+
 /// Structured context preserved across messages in a conversation session.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConversationContext {
@@ -27,6 +36,7 @@ pub struct ConversationContext {
     pub last_result_data: Option<Value>,
     pub last_result_count: Option<usize>,
     pub last_operation_success: Option<bool>,
+    pub last_undo: Option<UndoRecord>,
     pub turn_count: usize,
 }
 

@@ -502,3 +502,58 @@ fn test_47_give_me_employee_details() {
     assert_eq!(result.intent, Intent::GetEmployeeById);
     assert_eq!(result.params.employee_id, Some(1001));
 }
+
+// -----------------------------------------------------------------------------
+// Category 9: Advanced Deterministic Features (Analytics, Undo, Batch)
+// -----------------------------------------------------------------------------
+
+#[test]
+fn test_48_calculate_average_salary_analytics() {
+    let result = detect_intent("What is the average salary in IT?");
+    assert_eq!(result.intent, Intent::CalculateAnalytics);
+    assert_eq!(result.params.aggregation_type.as_deref(), Some("average"));
+    assert_eq!(result.params.department_name.as_deref(), Some("IT"));
+}
+
+#[test]
+fn test_49_calculate_highest_paid_analytics() {
+    let result = detect_intent("Who is the highest paid employee in Engineering?");
+    assert_eq!(result.intent, Intent::CalculateAnalytics);
+    assert_eq!(result.params.aggregation_type.as_deref(), Some("highest"));
+    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+}
+
+#[test]
+fn test_50_calculate_total_payroll_analytics() {
+    let result = detect_intent("Total monthly payroll for Sales department");
+    assert_eq!(result.intent, Intent::CalculateAnalytics);
+    assert_eq!(result.params.aggregation_type.as_deref(), Some("total"));
+    assert_eq!(result.params.department_name.as_deref(), Some("Sales"));
+}
+
+#[test]
+fn test_51_undo_last_update_intent() {
+    let result = detect_intent("Undo last update");
+    assert_eq!(result.intent, Intent::UndoLastUpdate);
+
+    let result2 = detect_intent("revert employee 1002");
+    assert_eq!(result2.intent, Intent::UndoLastUpdate);
+    assert_eq!(result2.params.employee_id, Some(1002));
+}
+
+#[test]
+fn test_52_batch_salary_increase_intent() {
+    let result = detect_intent("Give all Software Engineers a 5000 salary increase");
+    assert_eq!(result.intent, Intent::BatchUpdate);
+    assert_eq!(result.params.batch_action.as_deref(), Some("salary_increase"));
+    assert_eq!(result.params.batch_delta, Some(5000.0));
+}
+
+#[test]
+fn test_53_batch_transfer_intent() {
+    let result = detect_intent("Transfer all interns in Engineering to IT");
+    assert_eq!(result.intent, Intent::BatchUpdate);
+    assert_eq!(result.params.batch_action.as_deref(), Some("transfer"));
+    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+    assert_eq!(result.params.new_value.as_deref(), Some("IT"));
+}

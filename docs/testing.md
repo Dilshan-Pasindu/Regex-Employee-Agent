@@ -1,15 +1,16 @@
 # Testing Guide & Prompt Test Cases
 
-## Assignment Prompt Test Suite (77 Automated Tests)
+## Assignment Prompt Test Suite (85 Automated Tests)
 
 The assignment requires:
 > *"Prepare at least 30 prompt test cases, including alternate phrasing, case variations, missing parameters, invalid IDs, ambiguous requests, unsupported requests, and write-operation confirmation."*
 
-These test cases are implemented across **4 automated test files** under `rust-client/tests/`:
-1. **[regex_tests.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/tests/regex_tests.rs)** (51 tests)
+These test cases are implemented across **automated test files** under `rust-client/tests/`:
+1. **[regex_tests.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/tests/regex_tests.rs)** (57 tests)
 2. **[suggestion_tests.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/tests/suggestion_tests.rs)** (9 tests)
 3. **[planner_tests.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/tests/planner_tests.rs)** (8 tests)
 4. **[context_tests.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/tests/context_tests.rs)** (9 tests)
+5. **[fuzzy.rs](file:///Users/dilshanpasindu/Documents/GitHub/Spillabs-intern/rust-client/src/intent/fuzzy.rs)** (2 tests)
 
 ---
 

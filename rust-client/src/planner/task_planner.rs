@@ -63,6 +63,9 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
         status: ir.params.status.clone(),
         salary: salary_comp.map(|c| c.1).or(ir.params.salary),
         salary_operator: salary_comp.map(|c| c.0),
+        aggregation_type: ir.params.aggregation_type.clone(),
+        batch_action: ir.params.batch_action.clone(),
+        batch_delta: ir.params.batch_delta,
     };
 
     let requested_fields = ir.params.requested_fields.clone();
@@ -286,6 +289,30 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
                 };
                 map.insert("designationId".to_string(), json!(desig_id));
 
+                json!(map)
+            }
+            Intent::CalculateAnalytics => {
+                let mut map = serde_json::Map::new();
+                if let Some(ref d) = ir.params.department_name {
+                    map.insert("departmentName".to_string(), json!(d));
+                }
+                json!(map)
+            }
+            Intent::UndoLastUpdate => {
+                let mut map = serde_json::Map::new();
+                if let Some(id) = ir.params.employee_id {
+                    map.insert("employeeId".to_string(), json!(id));
+                }
+                json!(map)
+            }
+            Intent::BatchUpdate => {
+                let mut map = serde_json::Map::new();
+                if let Some(ref d) = ir.params.designation_name {
+                    map.insert("designationName".to_string(), json!(d));
+                }
+                if let Some(ref dept) = ir.params.department_name {
+                    map.insert("departmentName".to_string(), json!(dept));
+                }
                 json!(map)
             }
             _ => json!({}),
