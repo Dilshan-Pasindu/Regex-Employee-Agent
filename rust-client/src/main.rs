@@ -449,9 +449,7 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
         | Intent::GetDesignationList
         | Intent::CalculateAnalytics
         | Intent::UndoLastUpdate
-        | Intent::BatchUpdate => {
-            Ok(json!({}))
-        }
+        | Intent::BatchUpdate => Ok(json!({})),
 
         Intent::Unknown(_) => Ok(json!({})),
     }

@@ -332,7 +332,10 @@ async fn process_handler(
                     result: None,
                     success: false,
                     requires_confirmation: None,
-                    message: Some("Nothing to undo: no previous update operations found in this session.".to_string()),
+                    message: Some(
+                        "Nothing to undo: no previous update operations found in this session."
+                            .to_string(),
+                    ),
                     suggestions: None,
                     execution_plan: None,
                 }));
@@ -350,7 +353,12 @@ async fn process_handler(
             };
             let res = client.call_tool("search_employees", search_args).await;
             let count = match res {
-                Ok(ref r) => r.data.as_ref().and_then(|d| d.as_array()).map(|a| a.len()).unwrap_or(0),
+                Ok(ref r) => r
+                    .data
+                    .as_ref()
+                    .and_then(|d| d.as_array())
+                    .map(|a| a.len())
+                    .unwrap_or(0),
                 _ => 0,
             };
             let preview_data = res.ok().and_then(|r| r.data);
@@ -363,7 +371,10 @@ async fn process_handler(
                 result: preview_data,
                 success: true,
                 requires_confirmation: Some(true),
-                message: Some(format!("Found {} matching employee(s) for batch operation. Please confirm to apply changes.", count)),
+                message: Some(format!(
+                    "Found {} matching employee(s) for batch operation. Please confirm to apply changes.",
+                    count
+                )),
                 suggestions: None,
                 execution_plan: Some(json!(plan)),
             }));
@@ -387,9 +398,16 @@ async fn process_handler(
     // Capture undo snapshot before executing update_employee
     if let Intent::UpdateEmployee = intent_result.intent {
         if let Some(emp_id) = plan.extracted_conditions.employee_id {
-            if let Ok(lookup_res) = client.call_tool("get_employee_by_id", json!({ "employeeId": emp_id })).await {
+            if let Ok(lookup_res) = client
+                .call_tool("get_employee_by_id", json!({ "employeeId": emp_id }))
+                .await
+            {
                 if let Some(emp_obj) = lookup_res.data {
-                    let field = intent_result.params.field_to_update.clone().unwrap_or_else(|| "salary".to_string());
+                    let field = intent_result
+                        .params
+                        .field_to_update
+                        .clone()
+                        .unwrap_or_else(|| "salary".to_string());
                     let prev_val = match field.as_str() {
                         "salary" => emp_obj.get("salary").cloned().unwrap_or(json!(0.0)),
                         "status" => emp_obj.get("status").cloned().unwrap_or(json!("Active")),
@@ -444,7 +462,10 @@ async fn process_handler(
                     suggestions: None,
                     execution_plan: Some(json!(plan)),
                 })),
-                Err(e) => Err((StatusCode::INTERNAL_SERVER_ERROR, Json(json!({ "error": e.to_string() })))),
+                Err(e) => Err((
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(json!({ "error": e.to_string() })),
+                )),
             };
         }
     }
@@ -464,10 +485,15 @@ async fn process_handler(
                         if let Some(delta) = plan.extracted_conditions.batch_delta {
                             let cur_sal = emp.get("salary").and_then(|v| v.as_f64()).unwrap_or(0.0);
                             let new_sal = cur_sal + delta;
-                            let _ = client.call_tool("update_employee", json!({
-                                "employeeId": id,
-                                "salary": new_sal
-                            })).await;
+                            let _ = client
+                                .call_tool(
+                                    "update_employee",
+                                    json!({
+                                        "employeeId": id,
+                                        "salary": new_sal
+                                    }),
+                                )
+                                .await;
                             updated_count += 1;
                         }
                     }
@@ -482,7 +508,10 @@ async fn process_handler(
                     result: Some(json!({ "batchUpdatedCount": updated_count })),
                     success: true,
                     requires_confirmation: None,
-                    message: Some(format!("Successfully applied batch update to {} employee(s).", updated_count)),
+                    message: Some(format!(
+                        "Successfully applied batch update to {} employee(s).",
+                        updated_count
+                    )),
                     suggestions: None,
                     execution_plan: Some(json!(plan)),
                 }));
@@ -582,18 +611,27 @@ async fn process_handler(
                 if let Some(ref d) = outcome.data {
                     if let Some(arr) = d.as_array() {
                         if arr.len() > 1 && arr.len() <= 6 {
-                            let chips: Vec<String> = arr.iter().filter_map(|item| {
-                                let id = item.get("employeeId").and_then(|v| v.as_i64())?;
-                                let first = item.get("firstName").and_then(|v| v.as_str()).unwrap_or("");
-                                let last = item.get("lastName").and_then(|v| v.as_str()).unwrap_or("");
-                                let dept = item.get("departmentName").and_then(|v| v.as_str()).unwrap_or("");
-                                Some(format!("Show employee {} ({} {} - {})", id, first, last, dept))
-                            }).collect();
-                            if !chips.is_empty() {
-                                Some(chips)
-                            } else {
-                                None
-                            }
+                            let chips: Vec<String> = arr
+                                .iter()
+                                .filter_map(|item| {
+                                    let id = item.get("employeeId").and_then(|v| v.as_i64())?;
+                                    let first = item
+                                        .get("firstName")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    let last =
+                                        item.get("lastName").and_then(|v| v.as_str()).unwrap_or("");
+                                    let dept = item
+                                        .get("departmentName")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("");
+                                    Some(format!(
+                                        "Show employee {} ({} {} - {})",
+                                        id, first, last, dept
+                                    ))
+                                })
+                                .collect();
+                            if !chips.is_empty() { Some(chips) } else { None }
                         } else {
                             None
                         }
@@ -813,7 +851,8 @@ fn build_tool_args_json(ir: &IntentResult) -> Result<Value, String> {
                 "newValue": val,
             }))
         }
-        GetAllEmployees | GetDepartmentList | GetDesignationList | CalculateAnalytics | UndoLastUpdate | BatchUpdate => Ok(json!({})),
+        GetAllEmployees | GetDepartmentList | GetDesignationList | CalculateAnalytics
+        | UndoLastUpdate | BatchUpdate => Ok(json!({})),
         Unknown(_) => Ok(json!({})),
     }
 }

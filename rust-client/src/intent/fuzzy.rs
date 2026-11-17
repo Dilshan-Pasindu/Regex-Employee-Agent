@@ -31,9 +31,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
             if a_chars[i - 1].to_ascii_lowercase() == b_chars[j - 1].to_ascii_lowercase() {
                 dp[i][j] = dp[i - 1][j - 1];
             } else {
-                dp[i][j] = 1 + dp[i - 1][j - 1]
-                    .min(dp[i - 1][j])
-                    .min(dp[i][j - 1]);
+                dp[i][j] = 1 + dp[i - 1][j - 1].min(dp[i - 1][j]).min(dp[i][j - 1]);
             }
         }
     }

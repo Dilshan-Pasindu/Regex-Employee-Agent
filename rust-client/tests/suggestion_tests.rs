@@ -12,7 +12,10 @@ use employee_mcp_client::suggestions::{
 fn test_missing_employee_id() {
     let prompt = "Find employee";
     let ir = detect_intent(prompt);
-    assert!(matches!(ir.intent, employee_mcp_client::models::Intent::Unknown(_)));
+    assert!(matches!(
+        ir.intent,
+        employee_mcp_client::models::Intent::Unknown(_)
+    ));
     let ctx = ConversationContext::new();
 
     let classification = classify_prompt_error(prompt, &ir);
@@ -33,7 +36,10 @@ fn test_missing_employee_id() {
 fn test_invalid_employee_id() {
     let prompt = "Find employee abc";
     let ir = detect_intent(prompt);
-    assert!(matches!(ir.intent, employee_mcp_client::models::Intent::Unknown(_)));
+    assert!(matches!(
+        ir.intent,
+        employee_mcp_client::models::Intent::Unknown(_)
+    ));
     let ctx = ConversationContext::new();
 
     let classification = classify_prompt_error(prompt, &ir);
@@ -186,5 +192,8 @@ fn test_unknown_prompt_with_numeric_id_suggests_employee_operations() {
     let out = generate_suggestions(prompt, &ir, &ctx);
     assert_eq!(out.error_type, PromptErrorType::AmbiguousIntent);
     assert!(out.suggestions.contains(&"Find employee 1001".to_string()));
-    assert!(out.suggestions.contains(&"Show employee 1001 details".to_string()));
+    assert!(
+        out.suggestions
+            .contains(&"Show employee 1001 details".to_string())
+    );
 }

@@ -120,7 +120,9 @@ pub async fn execute_plan(
                             };
                             let msg = format!(
                                 "Average salary in {}: ${:.2} across {} employee(s).",
-                                dept_name, avg, salaries.len()
+                                dept_name,
+                                avg,
+                                salaries.len()
                             );
                             log.push(msg.clone());
                             outcome_msg = Some(msg);
@@ -171,7 +173,9 @@ pub async fn execute_plan(
                             let total: f64 = salaries.iter().map(|(s, _, _)| *s).sum();
                             let msg = format!(
                                 "Total monthly payroll for {}: ${:.2} ({} employees).",
-                                dept_name, total, salaries.len()
+                                dept_name,
+                                total,
+                                salaries.len()
                             );
                             log.push(msg.clone());
                             outcome_msg = Some(msg);

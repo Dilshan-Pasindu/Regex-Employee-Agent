@@ -120,10 +120,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "department to <name or id>"
-    if let Some(caps) =
-        regex::Regex::new(r"(?i)(?:'s\s+)?department\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s]*?)(?:\s*$)")
-            .unwrap()
-            .captures(prompt)
+    if let Some(caps) = regex::Regex::new(
+        r"(?i)(?:'s\s+)?department\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s]*?)(?:\s*$)",
+    )
+    .unwrap()
+    .captures(prompt)
     {
         params.field_to_update = Some("department".to_string());
         let dept = caps.name("val").map(|v| v.as_str().trim().to_string());
@@ -133,10 +134,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "designation to <name or id>"
-    if let Some(caps) =
-        regex::Regex::new(r"(?i)(?:'s\s+)?designation\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s\/]+?)(?:\s*$)")
-            .unwrap()
-            .captures(prompt)
+    if let Some(caps) = regex::Regex::new(
+        r"(?i)(?:'s\s+)?designation\s+to\s+(?P<val>[A-Za-z0-9][A-Za-z0-9\s\/]+?)(?:\s*$)",
+    )
+    .unwrap()
+    .captures(prompt)
     {
         params.field_to_update = Some("designation".to_string());
         let desig = caps.name("val").map(|v| v.as_str().trim().to_string());
@@ -159,10 +161,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "email to <email>"
-    if let Some(caps) =
-        regex::Regex::new(r"(?i)(?:'s\s+)?email\s+to\s+(?P<val>[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})")
-            .unwrap()
-            .captures(prompt)
+    if let Some(caps) = regex::Regex::new(
+        r"(?i)(?:'s\s+)?email\s+to\s+(?P<val>[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})",
+    )
+    .unwrap()
+    .captures(prompt)
     {
         params.field_to_update = Some("email".to_string());
         let val = caps.name("val").map(|v| v.as_str().to_lowercase());
@@ -172,10 +175,11 @@ fn extract_update_field(prompt: &str, params: &mut ExtractedParams) {
         }
     }
     // "phone to <number>"
-    if let Some(caps) =
-        regex::Regex::new(r"(?i)(?:'s\s+)?(?:phone|mobile|contact)\s+to\s+(?P<val>[0-9+\-\s]{7,20})")
-            .unwrap()
-            .captures(prompt)
+    if let Some(caps) = regex::Regex::new(
+        r"(?i)(?:'s\s+)?(?:phone|mobile|contact)\s+to\s+(?P<val>[0-9+\-\s]{7,20})",
+    )
+    .unwrap()
+    .captures(prompt)
     {
         params.field_to_update = Some("phone".to_string());
         let val = caps.name("val").map(|v| v.as_str().trim().to_string());
