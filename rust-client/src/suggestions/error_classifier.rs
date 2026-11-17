@@ -159,6 +159,15 @@ pub fn classify_prompt_error(prompt: &str, ir: &IntentResult) -> ClassificationR
                 }
             }
 
+            let corrected = crate::intent::fuzzy::autocorrect_prompt(p);
+            if corrected != p {
+                return ClassificationResult {
+                    error_type: PromptErrorType::AmbiguousIntent,
+                    user_explanation: format!("Did you mean: '{}'?", corrected),
+                    detected_entity: None,
+                };
+            }
+
             ClassificationResult {
                 error_type: PromptErrorType::AmbiguousIntent,
                 user_explanation: "I didn't recognize that request. Please see the suggestions below for supported capabilities:".to_string(),

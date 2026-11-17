@@ -96,6 +96,9 @@ pub enum Intent {
     GetEmployeeCount,
     AddEmployee,
     UpdateEmployee,
+    CalculateAnalytics,
+    UndoLastUpdate,
+    BatchUpdate,
     Unknown(String),
 }
 
@@ -110,12 +113,21 @@ impl Intent {
             Intent::GetEmployeeCount => Some("get_employee_count"),
             Intent::AddEmployee => Some("add_employee"),
             Intent::UpdateEmployee => Some("update_employee"),
+            Intent::CalculateAnalytics => Some("search_employees"),
+            Intent::UndoLastUpdate => Some("update_employee"),
+            Intent::BatchUpdate => Some("search_employees"),
             Intent::Unknown(_) => None,
         }
     }
 
     pub fn requires_confirmation(&self) -> bool {
-        matches!(self, Intent::AddEmployee | Intent::UpdateEmployee)
+        matches!(
+            self,
+            Intent::AddEmployee
+                | Intent::UpdateEmployee
+                | Intent::UndoLastUpdate
+                | Intent::BatchUpdate
+        )
     }
 }
 
@@ -134,6 +146,9 @@ pub struct ExtractedParams {
     pub field_to_update: Option<String>,
     pub new_value: Option<String>,
     pub requested_fields: Vec<String>,
+    pub aggregation_type: Option<String>,
+    pub batch_action: Option<String>,
+    pub batch_delta: Option<f64>,
 }
 
 #[derive(Debug, Clone)]

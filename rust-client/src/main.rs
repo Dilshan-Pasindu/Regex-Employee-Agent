@@ -444,7 +444,12 @@ fn build_tool_args(intent: &IntentResult) -> Result<Value, String> {
         }
 
         // Read-only tools with no required args
-        Intent::GetAllEmployees | Intent::GetDepartmentList | Intent::GetDesignationList => {
+        Intent::GetAllEmployees
+        | Intent::GetDepartmentList
+        | Intent::GetDesignationList
+        | Intent::CalculateAnalytics
+        | Intent::UndoLastUpdate
+        | Intent::BatchUpdate => {
             Ok(json!({}))
         }
 

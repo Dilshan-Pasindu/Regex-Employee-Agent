@@ -244,10 +244,7 @@ function WelcomeScreen({ onChip }: { onChip: (text: string) => void }) {
           Employee Management Agent
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: 0 }}>
-          Ask me anything about your employees — no AI involved!
-        </p>
-        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: 4 }}>
-          Powered by deterministic <strong>Rust Regex</strong> · .NET MCP · FastAPI · MySQL
+          Manage your organization's employees, departments, and payroll.
         </p>
       </div>
 

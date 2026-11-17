@@ -251,3 +251,34 @@ pub static RE_EXIT: Lazy<Regex> =
 
 /// Help commands
 pub static RE_HELP: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?i)^(help|\?|commands?)$").unwrap());
+
+/// Analytics and statistical aggregation patterns (Feature 1)
+pub static RE_ANALYTICS_AVERAGE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:what\s+is\s+the\s+)?(?:average|avg|mean)\s+salary(?:\s+in\s+(?:the\s+)?(?P<dept>[a-zA-Z\s]+?)(?:\s+department)?)?\s*\??$").unwrap()
+});
+
+pub static RE_ANALYTICS_HIGHEST: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:who\s+is\s+the\s+)?(?:highest|max|maximum|top)\s+paid(?:\s+employee)?(?:\s+in\s+(?:the\s+)?(?P<dept>[a-zA-Z\s]+?)(?:\s+department)?)?\s*\??$").unwrap()
+});
+
+pub static RE_ANALYTICS_LOWEST: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:who\s+is\s+the\s+)?(?:lowest|min|minimum)\s+paid(?:\s+employee)?(?:\s+in\s+(?:the\s+)?(?P<dept>[a-zA-Z\s]+?)(?:\s+department)?)?\s*\??$").unwrap()
+});
+
+pub static RE_ANALYTICS_TOTAL: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:what\s+is\s+the\s+)?(?:total\s+(?:monthly\s+)?payroll|sum\s+of\s+salaries|total\s+salaries)(?:\s+(?:for|in)\s+(?:the\s+)?(?P<dept>[a-zA-Z\s]+?)(?:\s+department)?)?\s*\??$").unwrap()
+});
+
+/// Undo / Revert operations (Feature 3)
+pub static RE_UNDO: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)^(?:undo|revert)(?:\s+last\s+(?:update|change|mutation|action))?(?:\s+employee\s+(?P<id>\d+))?$").unwrap()
+});
+
+/// Batch operations (Feature 5)
+pub static RE_BATCH_SALARY_INCREASE: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)(?:give|grant|add)\s+all\s+(?P<role>[a-zA-Z\s]+?)\s+(?:a\s+)?(?P<amount>\d+(?:\.\d+)?)\s+(?:salary\s+)?(?:increase|raise)").unwrap()
+});
+
+pub static RE_BATCH_TRANSFER: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"(?i)transfer\s+all\s+(?P<role>[a-zA-Z\s]+?)\s+in\s+(?P<from_dept>[a-zA-Z\s]+?)\s+to\s+(?P<to_dept>[a-zA-Z\s]+)").unwrap()
+});

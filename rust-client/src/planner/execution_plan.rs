@@ -53,6 +53,9 @@ pub struct ExtractedConditions {
     pub status: Option<String>,
     pub salary: Option<f64>,
     pub salary_operator: Option<ComparisonOperator>,
+    pub aggregation_type: Option<String>,
+    pub batch_action: Option<String>,
+    pub batch_delta: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
