@@ -431,7 +431,16 @@ async fn process_handler(
             let mut undo_args = serde_json::Map::new();
             undo_args.insert("employeeId".to_string(), json!(undo.employee_id));
             if undo.field_to_update == "salary" {
-                if let Some(sal) = undo.previous_value.as_f64() {
+                let sal_val = undo
+                    .previous_value
+                    .as_f64()
+                    .or_else(|| undo.previous_value.as_i64().map(|i| i as f64))
+                    .or_else(|| {
+                        undo.previous_value
+                            .as_str()
+                            .and_then(|s| s.parse::<f64>().ok())
+                    });
+                if let Some(sal) = sal_val {
                     undo_args.insert("salary".to_string(), json!(sal));
                 }
             } else if undo.field_to_update == "status" {
@@ -439,7 +448,12 @@ async fn process_handler(
                     undo_args.insert("status".to_string(), json!(st));
                 }
             } else if undo.field_to_update == "department" {
-                if let Some(did) = undo.previous_value.as_i64() {
+                let did_val = undo.previous_value.as_i64().or_else(|| {
+                    undo.previous_value
+                        .as_str()
+                        .and_then(|s| s.parse::<i64>().ok())
+                });
+                if let Some(did) = did_val {
                     undo_args.insert("departmentId".to_string(), json!(did));
                 }
             }
