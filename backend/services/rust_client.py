@@ -13,16 +13,19 @@ RUST_SERVICE_URL = os.getenv("RUST_SERVICE_URL", "http://localhost:5001")
 _TIMEOUT = 30.0  # seconds
 
 
-async def process_prompt(prompt: str, confirmed: bool = False) -> Dict[str, Any]:
+async def process_prompt(prompt: str, confirmed: bool = False, session_id: Optional[str] = None) -> Dict[str, Any]:
     """
     POST /process to the Rust HTTP service.
     Returns the full JSON response as a dict.
     Raises httpx.HTTPStatusError on 4xx/5xx, httpx.ConnectError when Rust is down.
     """
     async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+        payload: Dict[str, Any] = {"prompt": prompt, "confirmed": confirmed}
+        if session_id:
+            payload["session_id"] = session_id
         resp = await client.post(
             f"{RUST_SERVICE_URL}/process",
-            json={"prompt": prompt, "confirmed": confirmed},
+            json=payload,
         )
         resp.raise_for_status()
         return resp.json()

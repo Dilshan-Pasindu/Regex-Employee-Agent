@@ -28,7 +28,7 @@ async def chat(request: Request, body: ChatRequest):
 
     # Call Rust HTTP service
     try:
-        rust_resp = await rust_client.process_prompt(body.prompt, body.confirmed)
+        rust_resp = await rust_client.process_prompt(body.prompt, body.confirmed, session_id)
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503,
