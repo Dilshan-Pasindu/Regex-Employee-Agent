@@ -73,7 +73,10 @@ pub fn generate_suggestions(
     };
 
     // If a typo autocorrection was proposed, put it as the primary suggestion chip
-    if classification.user_explanation.starts_with("Did you mean: '") {
+    if classification
+        .user_explanation
+        .starts_with("Did you mean: '")
+    {
         if let Some(start) = classification.user_explanation.find('\'') {
             if let Some(end) = classification.user_explanation.rfind('\'') {
                 if start < end {

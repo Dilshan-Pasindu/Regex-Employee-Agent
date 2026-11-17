@@ -148,17 +148,13 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
                     map.insert("hireDate".to_string(), json!(d));
                 }
                 // Handle department update (either ID directly or department name resolution)
-                let dept_val = ir
-                    .params
-                    .department_name
-                    .as_ref()
-                    .or_else(|| {
-                        if ir.params.field_to_update.as_deref() == Some("department") {
-                            ir.params.new_value.as_ref()
-                        } else {
-                            None
-                        }
-                    });
+                let dept_val = ir.params.department_name.as_ref().or_else(|| {
+                    if ir.params.field_to_update.as_deref() == Some("department") {
+                        ir.params.new_value.as_ref()
+                    } else {
+                        None
+                    }
+                });
                 if let Some(d_val) = dept_val {
                     if let Ok(id) = d_val.parse::<i32>() {
                         map.insert("departmentId".to_string(), json!(id));
@@ -178,17 +174,13 @@ pub fn create_execution_plan(prompt: &str, ir: &IntentResult) -> ExecutionPlan {
                     }
                 }
                 // Handle designation update
-                let des_val = ir
-                    .params
-                    .designation_name
-                    .as_ref()
-                    .or_else(|| {
-                        if ir.params.field_to_update.as_deref() == Some("designation") {
-                            ir.params.new_value.as_ref()
-                        } else {
-                            None
-                        }
-                    });
+                let des_val = ir.params.designation_name.as_ref().or_else(|| {
+                    if ir.params.field_to_update.as_deref() == Some("designation") {
+                        ir.params.new_value.as_ref()
+                    } else {
+                        None
+                    }
+                });
                 if let Some(des_str) = des_val {
                     if let Ok(id) = des_str.parse::<i32>() {
                         map.insert("designationId".to_string(), json!(id));

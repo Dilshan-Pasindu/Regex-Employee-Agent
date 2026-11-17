@@ -520,7 +520,10 @@ fn test_49_calculate_highest_paid_analytics() {
     let result = detect_intent("Who is the highest paid employee in Engineering?");
     assert_eq!(result.intent, Intent::CalculateAnalytics);
     assert_eq!(result.params.aggregation_type.as_deref(), Some("highest"));
-    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+    assert_eq!(
+        result.params.department_name.as_deref(),
+        Some("Engineering")
+    );
 }
 
 #[test]
@@ -545,7 +548,10 @@ fn test_51_undo_last_update_intent() {
 fn test_52_batch_salary_increase_intent() {
     let result = detect_intent("Give all Software Engineers a 5000 salary increase");
     assert_eq!(result.intent, Intent::BatchUpdate);
-    assert_eq!(result.params.batch_action.as_deref(), Some("salary_increase"));
+    assert_eq!(
+        result.params.batch_action.as_deref(),
+        Some("salary_increase")
+    );
     assert_eq!(result.params.batch_delta, Some(5000.0));
 }
 
@@ -554,6 +560,9 @@ fn test_53_batch_transfer_intent() {
     let result = detect_intent("Transfer all interns in Engineering to IT");
     assert_eq!(result.intent, Intent::BatchUpdate);
     assert_eq!(result.params.batch_action.as_deref(), Some("transfer"));
-    assert_eq!(result.params.department_name.as_deref(), Some("Engineering"));
+    assert_eq!(
+        result.params.department_name.as_deref(),
+        Some("Engineering")
+    );
     assert_eq!(result.params.new_value.as_deref(), Some("IT"));
 }

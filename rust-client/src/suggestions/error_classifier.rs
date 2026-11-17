@@ -176,7 +176,9 @@ pub fn classify_prompt_error(prompt: &str, ir: &IntentResult) -> ClassificationR
         }
         _ => ClassificationResult {
             error_type: PromptErrorType::ValidationError,
-            user_explanation: "The request could not be processed due to missing or invalid parameters.".to_string(),
+            user_explanation:
+                "The request could not be processed due to missing or invalid parameters."
+                    .to_string(),
             detected_entity: None,
         },
     }
