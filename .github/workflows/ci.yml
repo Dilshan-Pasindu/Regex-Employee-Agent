@@ -50,7 +50,7 @@ jobs:
         run: cargo test --manifest-path rust-client/Cargo.toml -- --nocapture
 
       - name: Check Formatting
-        run: cargo fmt --manifest-path rust-client/Cargo.toml -- --check
+        run: cargo fmt --manifest-path rust-client/Cargo.toml --check
 
   # ---------------------------------------------------------------------------
   # 2. .NET 8 MCP Server

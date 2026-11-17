@@ -448,10 +448,11 @@ async fn process_handler(
                     undo_args.insert("status".to_string(), json!(st));
                 }
             } else if undo.field_to_update == "department" {
-                let did_val = undo
-                    .previous_value
-                    .as_i64()
-                    .or_else(|| undo.previous_value.as_str().and_then(|s| s.parse::<i64>().ok()));
+                let did_val = undo.previous_value.as_i64().or_else(|| {
+                    undo.previous_value
+                        .as_str()
+                        .and_then(|s| s.parse::<i64>().ok())
+                });
                 if let Some(did) = did_val {
                     undo_args.insert("departmentId".to_string(), json!(did));
                 }
