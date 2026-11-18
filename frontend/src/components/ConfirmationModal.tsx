@@ -2,6 +2,8 @@
 // components/ConfirmationModal.tsx — Write-op confirmation (redesign)
 // =============================================================================
 
+import { UserPlus, Pencil, Check, X } from 'lucide-react';
+
 interface Props {
   intent: string;
   params: Record<string, unknown>;
@@ -51,9 +53,8 @@ export function ConfirmationModal({ intent, params, onConfirm, onCancel }: Props
               width: 40, height: 40, borderRadius: 12,
               background: isAdd ? 'rgba(124,58,237,0.12)' : 'rgba(249,115,22,0.12)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 20,
             }}>
-              {isAdd ? '➕' : '✏️'}
+              {isAdd ? <UserPlus size={20} color="#7c3aed" /> : <Pencil size={20} color="#f97316" />}
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--text)' }}>
@@ -109,11 +110,15 @@ export function ConfirmationModal({ intent, params, onConfirm, onCancel }: Props
                 fontFamily: 'var(--font-body)',
                 cursor: 'pointer',
                 transition: 'opacity 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
             >
-              ✓ Confirm
+              <Check size={15} /> Confirm
             </button>
             <button
               onClick={onCancel}
@@ -129,11 +134,15 @@ export function ConfirmationModal({ intent, params, onConfirm, onCancel }: Props
                 fontFamily: 'var(--font-body)',
                 cursor: 'pointer',
                 transition: 'background 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
               }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--border)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'var(--surface-2)')}
             >
-              ✗ Cancel
+              <X size={15} /> Cancel
             </button>
           </div>
         </div>

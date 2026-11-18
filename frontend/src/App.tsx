@@ -5,6 +5,15 @@
 // =============================================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { 
+  PanelLeftClose, 
+  PanelLeft, 
+  Sun, 
+  Moon, 
+  Wrench, 
+  SquarePen, 
+  Send 
+} from 'lucide-react';
 import { ChatPanel } from './components/ChatPanel';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { ToolCatalogDrawer } from './components/ToolCatalogDrawer';
@@ -269,12 +278,13 @@ export default function App() {
           <button
             onClick={() => setSidebarOpen(o => !o)}
             aria-label={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+            title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
             style={{
               background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff',
-              borderRadius: 8, padding: '5px 8px', cursor: 'pointer', fontSize: '1rem',
+              borderRadius: 8, padding: '6px 8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            {sidebarOpen ? '◀' : '▶'}
+            {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
           </button>
           <img
             src={botAvatar}
@@ -300,16 +310,16 @@ export default function App() {
             </span>
           )}
           <button onClick={() => setIsDark(d => !d)} aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
-            {isDark ? '☀️' : '🌙'}
+            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '6px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {isDark ? <Sun size={15} /> : <Moon size={15} />}
           </button>
           <button onClick={() => setDrawerOpen(o => !o)} aria-label="Open MCP tool catalogue"
-            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
-            🔧 Tools
+            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '5px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Wrench size={14} /> Tools
           </button>
           <button onClick={handleNewConversation} aria-label="New chat"
-            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '5px 10px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
-            ✏️ New
+            style={{ background: 'rgba(255,255,255,0.18)', border: 'none', color: '#fff', borderRadius: 10, padding: '5px 12px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <SquarePen size={14} /> New
           </button>
         </div>
       </header>
@@ -354,8 +364,8 @@ export default function App() {
                 {isListening && <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ef4444' }}>Listening...</span>}
               </button>
               <button onClick={handleSend} disabled={loading || !input.trim()} aria-label="Send message"
-                style={{ background: loading || !input.trim() ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg, #7c3aed, #db2777)', border: 'none', color: '#fff', borderRadius: 14, padding: '8px 20px', fontWeight: 700, fontSize: '0.85rem', fontFamily: 'var(--font-body)', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap' }}>
-                {loading ? '…' : 'Send ↑'}
+                style={{ background: loading || !input.trim() ? 'rgba(124,58,237,0.3)' : 'linear-gradient(135deg, #7c3aed, #db2777)', border: 'none', color: '#fff', borderRadius: 14, padding: '8px 18px', fontWeight: 700, fontSize: '0.85rem', fontFamily: 'var(--font-body)', cursor: loading || !input.trim() ? 'not-allowed' : 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}>
+                {loading ? '…' : <><span>Send</span> <Send size={14} /></>}
               </button>
             </div>
           </div>

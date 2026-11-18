@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { useRef, useEffect, useState } from 'react';
+import { Lightbulb, ArrowDown } from 'lucide-react';
 import type { ChatMessage } from '../types';
 import { StepTracePanel } from './StepTrace';
 import { EmployeeTable } from './EmployeeTable';
@@ -128,6 +129,9 @@ function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (te
                   fontWeight: 600,
                   fontFamily: 'var(--font-body)',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
                   transition: 'all 0.15s',
                   boxShadow: '0 1px 4px rgba(124,58,237,0.1)',
                 }}
@@ -142,7 +146,8 @@ function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (te
                   e.currentTarget.style.borderColor = 'var(--border)';
                 }}
               >
-                💡 {sug}
+                <Lightbulb size={13} style={{ flexShrink: 0 }} />
+                <span>{sug}</span>
               </button>
             ))}
           </div>
@@ -389,16 +394,20 @@ export function ChatPanel({ messages, onChipClick }: Props) {
             color: '#fff',
             border: 'none',
             borderRadius: 99,
-            padding: '6px 18px',
+            padding: '6px 16px',
             fontSize: '0.78rem',
             fontWeight: 700,
             fontFamily: 'var(--font-body)',
             cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
             transition: 'opacity 0.2s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
           }}
         >
-          ↓ Latest
+          <ArrowDown size={14} />
+          <span>Latest</span>
         </button>
       )}
     </div>

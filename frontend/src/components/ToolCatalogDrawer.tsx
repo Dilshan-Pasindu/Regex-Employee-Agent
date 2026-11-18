@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { useEffect, useState } from 'react';
+import { Wrench, X } from 'lucide-react';
 import { fetchTools } from '../api/client';
 import type { McpTool } from '../types';
 
@@ -63,8 +64,9 @@ export function ToolCatalogDrawer({ open, onClose }: Props) {
               width: 30, height: 30, borderRadius: 8,
               background: 'linear-gradient(135deg,#7c3aed,#db2777)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 15,
-            }}>🔧</span>
+            }}>
+              <Wrench size={16} color="#fff" />
+            </span>
             <h2 style={{ margin: 0, fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)' }}>
               MCP Tool Catalogue
             </h2>
@@ -75,14 +77,15 @@ export function ToolCatalogDrawer({ open, onClose }: Props) {
             style={{
               background: 'none', border: 'none',
               color: 'var(--text-muted)',
-              fontSize: '1.1rem', cursor: 'pointer',
-              padding: '2px 6px', borderRadius: 6,
+              cursor: 'pointer',
+              padding: '4px', borderRadius: 6,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'color 0.15s',
             }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text)')}
             onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 

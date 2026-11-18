@@ -4,6 +4,16 @@
 // =============================================================================
 
 import { useState, useEffect, useRef } from 'react';
+import { 
+  SquarePen, 
+  Search, 
+  MessageSquare, 
+  MoreVertical, 
+  Pencil, 
+  Archive, 
+  Trash2, 
+  MessagesSquare 
+} from 'lucide-react';
 import type { ConversationSummary } from '../types';
 import {
   listConversations,
@@ -150,33 +160,38 @@ export function ConversationSidebar({
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 8,
+            transition: 'opacity 0.2s',
           }}
         >
-          <span style={{ fontSize: '1rem' }}>✏️</span>
-          New Chat
+          <SquarePen size={16} />
+          <span>New Chat</span>
         </button>
       </div>
 
       {/* Search */}
       <div style={{ padding: '8px 12px', borderBottom: `1px solid ${border}` }}>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search conversations…"
-          style={{
-            width: '100%',
-            background: inputBg,
-            border: `1px solid ${border}`,
-            borderRadius: 8,
-            padding: '6px 10px',
-            fontSize: '0.78rem',
-            color: textMain,
-            outline: 'none',
-            boxSizing: 'border-box',
-          }}
-        />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <Search size={14} style={{ position: 'absolute', left: 10, color: textMuted, pointerEvents: 'none' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="Search conversations…"
+            style={{
+              width: '100%',
+              background: inputBg,
+              border: `1px solid ${border}`,
+              borderRadius: 8,
+              padding: '6px 10px 6px 30px',
+              fontSize: '0.78rem',
+              color: textMain,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+        </div>
       </div>
 
       {/* Conversation list */}
@@ -187,9 +202,9 @@ export function ConversationSidebar({
           </div>
         )}
         {!loading && conversations.length === 0 && (
-          <div style={{ textAlign: 'center', color: textMuted, fontSize: '0.75rem', padding: 16 }}>
-            No conversations yet.
-            <br />Start a new chat!
+          <div style={{ textAlign: 'center', color: textMuted, fontSize: '0.75rem', padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <MessagesSquare size={26} style={{ color: textMuted, opacity: 0.6 }} />
+            <span>No conversations yet.<br />Start a new chat!</span>
           </div>
         )}
         {conversations.map(conv => (
@@ -234,7 +249,7 @@ export function ConversationSidebar({
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'flex-start',
-                  gap: 6,
+                  gap: 8,
                 }}
                 onMouseEnter={e => {
                   if (activeConversationId !== conv.conversation_id)
@@ -245,6 +260,14 @@ export function ConversationSidebar({
                     (e.currentTarget.parentElement as HTMLElement).style.background = 'transparent';
                 }}
               >
+                <MessageSquare 
+                  size={14} 
+                  style={{ 
+                    color: activeConversationId === conv.conversation_id ? '#7c3aed' : textMuted, 
+                    marginTop: 3, 
+                    flexShrink: 0 
+                  }} 
+                />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
                     fontSize: '0.82rem',
@@ -271,14 +294,16 @@ export function ConversationSidebar({
                     border: 'none',
                     color: textMuted,
                     cursor: 'pointer',
-                    padding: '0 2px',
-                    fontSize: '0.9rem',
-                    lineHeight: 1,
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 4,
                     flexShrink: 0,
                   }}
                   title="More options"
                 >
-                  ⋯
+                  <MoreVertical size={14} />
                 </button>
               </div>
             )}
@@ -295,41 +320,78 @@ export function ConversationSidebar({
                   border: `1px solid ${border}`,
                   borderRadius: 8,
                   boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-                  minWidth: 140,
+                  minWidth: 130,
                   overflow: 'hidden',
+                  padding: '4px 0',
                 }}
               >
-                {[
-                  {
-                    label: '✏️ Rename', action: () => {
-                      setRenameValue(conv.title);
-                      setRenamingId(conv.conversation_id);
-                      setMenuOpenId(null);
-                    }
-                  },
-                  { label: '📦 Archive', action: () => handleArchive(conv.conversation_id) },
-                  { label: '🗑️ Delete', action: () => handleDelete(conv.conversation_id), danger: true },
-                ].map(item => (
-                  <button
-                    key={item.label}
-                    onClick={item.action}
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      textAlign: 'left',
-                      background: 'none',
-                      border: 'none',
-                      padding: '8px 14px',
-                      fontSize: '0.8rem',
-                      color: (item as any).danger ? '#ef4444' : textMain,
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                  >
-                    {item.label}
-                  </button>
-                ))}
+                <button
+                  onClick={() => {
+                    setRenameValue(conv.title);
+                    setRenamingId(conv.conversation_id);
+                    setMenuOpenId(null);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    padding: '7px 12px',
+                    fontSize: '0.78rem',
+                    color: textMain,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <Pencil size={13} style={{ color: textMuted }} />
+                  <span>Rename</span>
+                </button>
+                <button
+                  onClick={() => handleArchive(conv.conversation_id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    padding: '7px 12px',
+                    fontSize: '0.78rem',
+                    color: textMain,
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <Archive size={13} style={{ color: textMuted }} />
+                  <span>Archive</span>
+                </button>
+                <button
+                  onClick={() => handleDelete(conv.conversation_id)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    padding: '7px 12px',
+                    fontSize: '0.78rem',
+                    color: '#ef4444',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = hoverBg)}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <Trash2 size={13} style={{ color: '#ef4444' }} />
+                  <span>Delete</span>
+                </button>
               </div>
             )}
           </div>
