@@ -61,6 +61,7 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     intent: Mapped[str | None] = mapped_column(String(100), nullable=True)
     success: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")

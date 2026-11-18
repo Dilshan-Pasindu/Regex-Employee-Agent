@@ -69,6 +69,7 @@ class MsgOut(BaseModel):
     content: str
     intent: Optional[str]
     success: Optional[bool]
+    metadata_json: Optional[str] = None
     created_at: str
 
     @classmethod
@@ -80,6 +81,7 @@ class MsgOut(BaseModel):
             content=m.content,
             intent=m.intent,
             success=m.success,
+            metadata_json=getattr(m, "metadata_json", None),
             created_at=m.created_at.isoformat(),
         )
 

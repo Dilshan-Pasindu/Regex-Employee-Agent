@@ -68,5 +68,6 @@ export interface PersistedMessage {
   content: string;
   intent: string | null;
   success: boolean | null;
+  metadata_json?: string | null;
   created_at: string;
 }

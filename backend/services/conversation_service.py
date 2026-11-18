@@ -103,6 +103,7 @@ async def add_message(
     content: str,
     intent: str | None = None,
     success: bool | None = None,
+    metadata_json: str | None = None,
 ) -> Message:
     # Get next sequence number
     result = await db.execute(
@@ -117,6 +118,7 @@ async def add_message(
         content=content,
         intent=intent,
         success=success,
+        metadata_json=metadata_json,
     )
     db.add(msg)
 

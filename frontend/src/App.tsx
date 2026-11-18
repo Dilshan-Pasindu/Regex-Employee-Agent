@@ -14,7 +14,7 @@ import {
   createConversation,
   getConversationMessages,
 } from './api/client';
-import type { ChatMessage, ConfirmationState, PersistedMessage } from './types';
+import type { ChatMessage, ChatResponse, ConfirmationState, PersistedMessage } from './types';
 import botAvatar from './assets/bot-avatar.jpg';
 import micIcon from './assets/blue-mic.png';
 import './index.css';
@@ -24,11 +24,60 @@ function nanoid() {
 }
 
 function persistedToChat(m: PersistedMessage): ChatMessage {
+  let response: ChatResponse | undefined = undefined;
+  let content = m.content;
+
+  if (m.role === 'assistant') {
+    if (m.metadata_json) {
+      try {
+        const meta = JSON.parse(m.metadata_json);
+        response = {
+          session_id: meta.session_id || '',
+          prompt: meta.prompt || '',
+          intent: m.intent || meta.intent || 'unknown',
+          tool: meta.tool,
+          params: meta.params || {},
+          steps: meta.steps || [],
+          result: meta.result,
+          success: m.success ?? meta.success ?? true,
+          requires_confirmation: meta.requires_confirmation,
+          message: content,
+          suggestions: meta.suggestions || [],
+        };
+      } catch (err) {
+        console.warn('Failed to parse metadata_json', err);
+      }
+    } else {
+      // Graceful fallback for messages saved before metadata_json column:
+      // If content was a stringified Python dict, convert to JSON so EmployeeTable renders it
+      const trimmed = content.trim();
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          const normalizedJson = trimmed.replace(/'/g, '"');
+          const parsed = JSON.parse(normalizedJson);
+          response = {
+            session_id: '',
+            prompt: '',
+            intent: m.intent || 'unknown',
+            params: {},
+            steps: [],
+            result: parsed,
+            success: m.success ?? true,
+          };
+          content = 'Done.';
+        } catch {
+          // keep as raw markdown
+        }
+      }
+    }
+  }
+
   return {
     id: m.message_id,
     role: m.role === 'user' ? 'user' : 'agent',
-    content: m.content,
+    content,
     timestamp: new Date(m.created_at),
+    response,
   };
 }
 

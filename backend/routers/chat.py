@@ -75,11 +75,23 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
         suggestions=rust_resp.get("suggestions"),
     )
 
-    # Persist the assistant message to MySQL
-    agent_text = (
-        rust_resp.get("message")
-        or (str(rust_resp.get("result")) if rust_resp.get("result") else "Done.")
-    )
+    # Persist the assistant message to MySQL with full metadata for rich UI reconstruction
+    agent_text = rust_resp.get("message") or "Done."
+    metadata_payload = {
+        "session_id": session_id,
+        "prompt": body.prompt,
+        "intent": rust_resp.get("intent"),
+        "tool": rust_resp.get("tool"),
+        "params": rust_resp.get("params", {}),
+        "steps": rust_resp.get("steps", []),
+        "result": rust_resp.get("result"),
+        "suggestions": rust_resp.get("suggestions"),
+        "requires_confirmation": rust_resp.get("requires_confirmation"),
+        "success": rust_resp.get("success", False),
+    }
+    import json
+    metadata_str = json.dumps(metadata_payload)
+
     await conversation_service.add_message(
         db,
         conv.conversation_id,
@@ -87,6 +99,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
         agent_text,
         intent=rust_resp.get("intent"),
         success=rust_resp.get("success", False),
+        metadata_json=metadata_str,
     )
 
     # Also keep in-memory for backward compat with the old conversations router
