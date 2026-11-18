@@ -1,17 +1,5 @@
 # =============================================================================
-# main.py — FastAPI Application Entry Point (Phase 3 — Backend)
-#
-# Port: 5000 (default)  — configure via .env PORT variable
-#
-# API surface:
-#   POST   /api/chat                     → core agentic prompt endpoint
-#   GET    /api/tools                    → MCP tool catalogue (from Rust)
-#   GET    /api/health                   → system health check
-#   GET    /api/conversations            → list active sessions
-#   GET    /api/conversations/{id}       → fetch session history
-#   DELETE /api/conversations/{id}       → clear session
-#   GET    /docs                         → Swagger UI (auto-generated)
-#   GET    /redoc                        → ReDoc UI (auto-generated)
+# main.py — FastAPI Application Entry Point (Phase 1 — Persistent Chat History)
 # =============================================================================
 
 import os
@@ -23,19 +11,24 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-from routers import chat, tools, health, conversations
+from db import init_db
+from routers import chat, tools, health
+from routers import conv_mgmt
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     print("╔══════════════════════════════════════════════════════╗")
-    print("║   Employee Management — FastAPI Backend v1.0.0      ║")
-    print("║   Phase 3: Python/FastAPI → Rust → .NET MCP → MySQL ║")
+    print("║   Employee Management — FastAPI Backend v2.0.0      ║")
+    print("║   Phase 1: Persistent Chat History (MySQL)          ║")
     print("╚══════════════════════════════════════════════════════╝")
     rust_url = os.getenv("RUST_SERVICE_URL", "http://localhost:5001")
     print(f"  Rust service URL : {rust_url}")
     print(f"  Swagger UI       : http://localhost:{os.getenv('PORT', '5000')}/docs")
+    print("  Initialising conversation tables in MySQL…")
+    await init_db()
+    print("  MySQL conversation tables ready.")
     print()
     yield
     print("  FastAPI backend shutting down.")
@@ -44,15 +37,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Employee Management Agentic API",
     description=(
-        "Phase 3 Backend — FastAPI bridges the React frontend and the Rust/MCP gateway.\n\n"
+        "Phase 1: Persistent Chat History — MySQL-backed conversation management.\n\n"
         "**Request flow:**\n"
         "React UI → FastAPI (5000) → Rust HTTP (5001) → .NET MCP Server (STDIO) → MySQL\n\n"
         "**Key design:**\n"
         "- Zero LLM/AI: intent detection is 100% deterministic Rust Regex.\n"
         "- Write operations (add/update) require a two-step confirmation flow.\n"
-        "- Session-based conversation history (in-memory per backend process).\n"
+        "- Persistent conversation history in MySQL (survives restarts).\n"
     ),
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -79,14 +72,14 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(tools.router)
 app.include_router(health.router)
-app.include_router(conversations.router)
+app.include_router(conv_mgmt.router)
 
 
 @app.get("/", include_in_schema=False)
 async def root():
     return {
         "service": "Employee Management Agentic API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "docs": "/docs",
         "health": "/api/health",
     }

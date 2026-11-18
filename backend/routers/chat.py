@@ -1,5 +1,6 @@
 # =============================================================================
 # routers/chat.py — POST /api/chat  (core agentic endpoint)
+# Phase 1: adds MySQL persistence for messages alongside existing in-memory store
 # =============================================================================
 
 from __future__ import annotations
@@ -8,23 +9,42 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from db import get_db
 from models import ChatRequest, ChatResponse, StepTrace, ConversationEntry
+from services import conversation_service
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# In-memory conversation store: {session_id: [ConversationEntry]}
+# In-memory conversation store still used for Rust session_id continuity
 _conversations: Dict[str, List[ConversationEntry]] = {}
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: Request, body: ChatRequest):
+async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(get_db)):
     from services import rust_client  # local import to allow env override in tests
 
     # Resolve / create session
     session_id = body.session_id or str(uuid.uuid4())
+
+    # --- Ensure a Conversation row exists in MySQL for this session_id ---
+    # We use the session_id as the conversation_id directly (they are the same UUID)
+    conv = await conversation_service.get_conversation(db, session_id, "default_user")
+    if conv is None:
+        conv = await conversation_service.create_conversation(db, "default_user", body.prompt)
+        # Override the auto-generated UUID with the session_id so they stay in sync
+        # Actually: on first message, the session_id is freshly generated here,
+        # so we set conversation_id = session_id by creating with explicit id.
+        # Simpler approach: use the returned conv.conversation_id as the session_id.
+        session_id = conv.conversation_id
+
+    # Persist the user message
+    await conversation_service.add_message(
+        db, conv.conversation_id, "user", body.prompt
+    )
 
     # Call Rust HTTP service
     try:
@@ -58,14 +78,23 @@ async def chat(request: Request, body: ChatRequest):
         suggestions=rust_resp.get("suggestions"),
     )
 
-    # Persist conversation history
-    history = _conversations.setdefault(session_id, [])
-    history.append(ConversationEntry(role="user", content=body.prompt))
-
+    # Persist the assistant message to MySQL
     agent_text = (
         rust_resp.get("message")
         or (str(rust_resp.get("result")) if rust_resp.get("result") else "Done.")
     )
+    await conversation_service.add_message(
+        db,
+        conv.conversation_id,
+        "assistant",
+        agent_text,
+        intent=rust_resp.get("intent"),
+        success=rust_resp.get("success", False),
+    )
+
+    # Also keep in-memory for backward compat with the old conversations router
+    history = _conversations.setdefault(session_id, [])
+    history.append(ConversationEntry(role="user", content=body.prompt))
     history.append(ConversationEntry(
         role="agent",
         content=agent_text,
@@ -77,5 +106,5 @@ async def chat(request: Request, body: ChatRequest):
 
 
 def get_conversation_store() -> Dict[str, List[ConversationEntry]]:
-    """Expose store to the conversations router."""
+    """Expose store to the old conversations router (kept for backward compat)."""
     return _conversations

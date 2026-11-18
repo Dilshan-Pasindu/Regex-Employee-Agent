@@ -47,3 +47,26 @@ export interface ConfirmationState {
   params: Record<string, unknown>;
   sessionId: string;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1 — Persistent conversation types
+// ---------------------------------------------------------------------------
+
+export interface ConversationSummary {
+  conversation_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string | null;
+  is_archived: boolean;
+}
+
+export interface PersistedMessage {
+  message_id: string;
+  sequence_number: number;
+  role: string;        // "user" | "assistant"
+  content: string;
+  intent: string | null;
+  success: boolean | null;
+  created_at: string;
+}
