@@ -48,9 +48,17 @@ def generate_title(first_prompt: str) -> str:
 # Commands
 # ---------------------------------------------------------------------------
 
-async def create_conversation(db: AsyncSession, user_id: str, first_prompt: str | None = None) -> Conversation:
+async def create_conversation(
+    db: AsyncSession,
+    user_id: str,
+    first_prompt: str | None = None,
+    conversation_id: str | None = None,
+) -> Conversation:
     title = generate_title(first_prompt) if first_prompt else "New Conversation"
-    conv = Conversation(user_id=user_id, title=title)
+    kwargs: dict = {"user_id": user_id, "title": title}
+    if conversation_id:
+        kwargs["conversation_id"] = conversation_id
+    conv = Conversation(**kwargs)
     db.add(conv)
     await db.commit()
     await db.refresh(conv)
@@ -137,7 +145,8 @@ async def list_conversations(
     )
     if not include_archived:
         q = q.where(Conversation.is_archived == False)
-    q = q.order_by(Conversation.last_message_at.desc().nullslast(), Conversation.created_at.desc())
+    # In MySQL, NULL values naturally sort last when ordering DESC
+    q = q.order_by(Conversation.last_message_at.desc(), Conversation.created_at.desc())
     q = q.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(q)
     return list(result.scalars().all())

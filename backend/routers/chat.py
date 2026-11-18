@@ -34,12 +34,9 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
     # We use the session_id as the conversation_id directly (they are the same UUID)
     conv = await conversation_service.get_conversation(db, session_id, "default_user")
     if conv is None:
-        conv = await conversation_service.create_conversation(db, "default_user", body.prompt)
-        # Override the auto-generated UUID with the session_id so they stay in sync
-        # Actually: on first message, the session_id is freshly generated here,
-        # so we set conversation_id = session_id by creating with explicit id.
-        # Simpler approach: use the returned conv.conversation_id as the session_id.
-        session_id = conv.conversation_id
+        conv = await conversation_service.create_conversation(
+            db, "default_user", body.prompt, conversation_id=session_id
+        )
 
     # Persist the user message
     await conversation_service.add_message(
