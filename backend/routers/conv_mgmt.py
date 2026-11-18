@@ -1,12 +1,12 @@
 # =============================================================================
-# routers/conv_mgmt.py — Persistent conversation management API (Phase 1)
+# routers/conv_mgmt.py — Persistent conversation management API
 #
 # POST   /api/conversations                    → create conversation
 # GET    /api/conversations                    → list conversations
 # GET    /api/conversations/search             → search
 # GET    /api/conversations/{id}               → get conversation
 # PATCH  /api/conversations/{id}               → rename
-# POST   /api/conversations/{id}/archive       → archive
+# PATCH  /api/conversations/{id}/pin           → pin / unpin
 # DELETE /api/conversations/{id}               → soft delete
 # GET    /api/conversations/{id}/messages      → paginated messages
 # =============================================================================
@@ -21,7 +21,7 @@ from db import get_db
 from services.conversation_service import (
     create_conversation,
     rename_conversation,
-    archive_conversation,
+    pin_conversation,
     delete_conversation,
     get_conversation,
     get_messages,
@@ -48,7 +48,8 @@ class ConvOut(BaseModel):
     created_at: str
     updated_at: str
     last_message_at: Optional[str]
-    is_archived: bool
+    is_pinned: bool
+    pinned_at: Optional[str]
 
     @classmethod
     def from_orm(cls, c) -> "ConvOut":
@@ -58,7 +59,8 @@ class ConvOut(BaseModel):
             created_at=c.created_at.isoformat(),
             updated_at=c.updated_at.isoformat(),
             last_message_at=c.last_message_at.isoformat() if c.last_message_at else None,
-            is_archived=c.is_archived,
+            is_pinned=c.is_pinned,
+            pinned_at=c.pinned_at.isoformat() if c.pinned_at else None,
         )
 
 
@@ -94,6 +96,10 @@ class RenameBody(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
 
 
+class PinBody(BaseModel):
+    pinned: bool
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -108,10 +114,9 @@ async def create_conv(body: CreateConvBody, db: AsyncSession = Depends(get_db)):
 async def list_convs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    include_archived: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
-    convs = await list_conversations(db, DEFAULT_USER, page, page_size, include_archived)
+    convs = await list_conversations(db, DEFAULT_USER, page, page_size)
     return {"conversations": [ConvOut.from_orm(c) for c in convs], "page": page, "page_size": page_size}
 
 
@@ -142,12 +147,15 @@ async def rename_conv(conversation_id: str, body: RenameBody, db: AsyncSession =
     return ConvOut.from_orm(conv)
 
 
-@router.post("/{conversation_id}/archive")
-async def archive_conv(conversation_id: str, db: AsyncSession = Depends(get_db)):
-    ok = await archive_conversation(db, conversation_id, DEFAULT_USER)
-    if not ok:
+@router.patch("/{conversation_id}/pin")
+async def pin_conv(conversation_id: str, body: PinBody, db: AsyncSession = Depends(get_db)):
+    try:
+        conv = await pin_conversation(db, conversation_id, DEFAULT_USER, body.pinned)
+    except ValueError:
+        raise HTTPException(400, "max_pins")
+    if not conv:
         raise HTTPException(404, "Conversation not found")
-    return {"message": "Conversation archived"}
+    return ConvOut.from_orm(conv)
 
 
 @router.delete("/{conversation_id}")

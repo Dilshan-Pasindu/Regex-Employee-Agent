@@ -54,12 +54,10 @@ export async function createConversation(title?: string): Promise<ConversationSu
 export async function listConversations(
   page = 1,
   pageSize = 30,
-  includeArchived = false,
 ): Promise<{ conversations: ConversationSummary[]; page: number; page_size: number }> {
   const params = new URLSearchParams({
     page: String(page),
     page_size: String(pageSize),
-    include_archived: String(includeArchived),
   });
   return request<{ conversations: ConversationSummary[]; page: number; page_size: number }>(
     `/api/conversations?${params}`,
@@ -79,8 +77,11 @@ export async function renameConversation(id: string, title: string): Promise<Con
   });
 }
 
-export async function archiveConversation(id: string): Promise<void> {
-  await request<unknown>(`/api/conversations/${id}/archive`, { method: 'POST' });
+export async function pinConversation(id: string, pinned: boolean): Promise<ConversationSummary> {
+  return request<ConversationSummary>(`/api/conversations/${id}/pin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pinned }),
+  });
 }
 
 export async function deleteConversation(id: string): Promise<void> {

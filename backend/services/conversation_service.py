@@ -1,6 +1,6 @@
 # =============================================================================
 # services/conversation_service.py — CQRS-style service for conversation CRUD
-# Commands: create, rename, archive, delete
+# Commands: create, rename, pin, delete
 # Queries: list, get, get_messages, search
 # =============================================================================
 from __future__ import annotations
@@ -76,14 +76,31 @@ async def rename_conversation(db: AsyncSession, conversation_id: str, user_id: s
     return conv
 
 
-async def archive_conversation(db: AsyncSession, conversation_id: str, user_id: str) -> bool:
+async def pin_conversation(
+    db: AsyncSession, conversation_id: str, user_id: str, pin: bool
+) -> Conversation | None:
     conv = await _get_owned(db, conversation_id, user_id)
     if not conv:
-        return False
-    conv.is_archived = True
+        return None
+    if pin:
+        # Count currently pinned chats for this user
+        result = await db.execute(
+            select(func.count()).where(
+                Conversation.user_id == user_id,
+                Conversation.is_pinned == True,
+                Conversation.is_deleted == False,
+            )
+        )
+        pinned_count = result.scalar() or 0
+        # Only block if this conversation is not already pinned and would exceed 3
+        if not conv.is_pinned and pinned_count >= 3:
+            raise ValueError("max_pins")
+    conv.is_pinned = pin
+    conv.pinned_at = _utcnow() if pin else None
     conv.updated_at = _utcnow()
     await db.commit()
-    return True
+    await db.refresh(conv)
+    return conv
 
 
 async def delete_conversation(db: AsyncSession, conversation_id: str, user_id: str) -> bool:
@@ -138,18 +155,24 @@ async def add_message(
 # ---------------------------------------------------------------------------
 
 async def list_conversations(
-    db: AsyncSession, user_id: str, page: int = 1, page_size: int = 20, include_archived: bool = False
+    db: AsyncSession, user_id: str, page: int = 1, page_size: int = 20
 ) -> list[Conversation]:
     q = (
         select(Conversation)
         .where(Conversation.user_id == user_id)
         .where(Conversation.is_deleted == False)
+        # Pinned first (is_pinned DESC), then pinned_at DESC for pinned group,
+        # then last_message_at DESC / created_at DESC for unpinned group.
+        # MySQL-compatible: no NULLS LAST needed since NULLs sort last on DESC.
+        .order_by(
+            Conversation.is_pinned.desc(),
+            Conversation.pinned_at.desc(),
+            Conversation.last_message_at.desc(),
+            Conversation.created_at.desc(),
+        )
+        .offset((page - 1) * page_size)
+        .limit(page_size)
     )
-    if not include_archived:
-        q = q.where(Conversation.is_archived == False)
-    # In MySQL, NULL values naturally sort last when ordering DESC
-    q = q.order_by(Conversation.last_message_at.desc(), Conversation.created_at.desc())
-    q = q.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(q)
     return list(result.scalars().all())
 
@@ -187,7 +210,10 @@ async def search_conversations(
         .where(Conversation.user_id == user_id)
         .where(Conversation.is_deleted == False)
         .where(Conversation.title.ilike(f"%{query}%"))
-        .order_by(Conversation.updated_at.desc())
+        .order_by(
+            Conversation.is_pinned.desc(),
+            Conversation.updated_at.desc(),
+        )
         .offset((page - 1) * page_size)
         .limit(page_size)
     )

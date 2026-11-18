@@ -58,7 +58,8 @@ export interface ConversationSummary {
   created_at: string;
   updated_at: string;
   last_message_at: string | null;
-  is_archived: boolean;
+  is_pinned: boolean;
+  pinned_at: string | null;
 }
 
 export interface PersistedMessage {
