@@ -10,6 +10,7 @@ import { ToolCatalogDrawer } from './components/ToolCatalogDrawer';
 import { sendChat } from './api/client';
 import type { ChatMessage, ConfirmationState } from './types';
 import botAvatar from './assets/bot-avatar.jpg';
+import micIcon from './assets/blue-mic.png';
 import './index.css';
 
 function nanoid() {
@@ -353,21 +354,34 @@ export default function App() {
             aria-label="Voice input"
             title={isListening ? "Listening... click to stop" : "Voice input (dictate prompt)"}
             style={{
-              background: isListening ? '#dc2626' : 'transparent',
-              border: '1px solid var(--border)',
+              background: isListening ? 'rgba(239, 68, 68, 0.15)' : 'rgba(9, 106, 217, 0.08)',
+              border: isListening ? '1.5px solid #ef4444' : '1px solid rgba(9, 106, 217, 0.3)',
               borderRadius: 12,
-              padding: '6px 12px',
-              fontSize: '1rem',
+              padding: isListening ? '6px 12px' : '6px 10px',
               cursor: 'pointer',
-              color: isListening ? '#fff' : 'var(--text)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s',
-              animation: isListening ? 'pulse 1.5s infinite' : 'none',
+              gap: 6,
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              animation: isListening ? 'micPulse 1.5s infinite ease-in-out' : 'none',
             }}
           >
-            {isListening ? '⏹️ Rec' : '🎙️'}
+            <img
+              src={micIcon}
+              alt="Microphone"
+              style={{
+                width: 20,
+                height: 20,
+                objectFit: 'contain',
+                filter: isListening ? 'drop-shadow(0 0 4px #ef4444)' : 'none',
+              }}
+            />
+            {isListening && (
+              <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ef4444' }}>
+                Listening...
+              </span>
+            )}
           </button>
           <button
             onClick={handleSend}
