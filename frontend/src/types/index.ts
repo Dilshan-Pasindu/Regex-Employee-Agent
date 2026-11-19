@@ -20,6 +20,9 @@ export interface ChatResponse {
   requires_confirmation?: boolean;
   message?: string;
   suggestions?: string[];
+  request_id?: string;
+  status?: string;
+  error_code?: string;
 }
 
 export interface ChatMessage {
@@ -71,4 +74,9 @@ export interface PersistedMessage {
   success: boolean | null;
   metadata_json?: string | null;
   created_at: string;
+  status?: string;
+  request_id?: string | null;
+  error_code?: string | null;
+  processing_started_at?: string | null;
+  processing_completed_at?: string | null;
 }

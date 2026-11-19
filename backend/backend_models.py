@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Boolean, DateTime, ForeignKey, Integer, String, Text, func
+    BigInteger, Boolean, DateTime, ForeignKey, Integer, String, Text, func
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -83,6 +83,50 @@ class Message(Base):
     intent: Mapped[str | None] = mapped_column(String(100), nullable=True)
     success: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="COMPLETED", nullable=False)
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processing_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    processing_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+
+
+class ConversationLock(Base):
+    __tablename__ = "ConversationLocks"
+
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("Conversations.conversation_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    lock_owner: Mapped[str] = mapped_column(String(100), nullable=False)
+    fencing_token: Mapped[int] = mapped_column(BigInteger, default=1, nullable=False)
+    lease_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    acquired_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    conversation: Mapped["Conversation"] = relationship("Conversation")
+
+
+class IdempotencyRecord(Base):
+    __tablename__ = "IdempotencyRecords"
+
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("Conversations.conversation_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # PROCESSING, COMPLETED, FAILED, UNCERTAIN
+    response_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+
+    conversation: Mapped["Conversation"] = relationship("Conversation")

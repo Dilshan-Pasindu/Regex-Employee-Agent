@@ -128,6 +128,12 @@ async def add_message(
     intent: str | None = None,
     success: bool | None = None,
     metadata_json: str | None = None,
+    request_id: str | None = None,
+    status: str = "COMPLETED",
+    error_code: str | None = None,
+    error_message: str | None = None,
+    processing_started_at: datetime | None = None,
+    processing_completed_at: datetime | None = None,
 ) -> Message:
     # Get next sequence number
     result = await db.execute(
@@ -143,6 +149,12 @@ async def add_message(
         intent=intent,
         success=success,
         metadata_json=metadata_json,
+        request_id=request_id,
+        status=status,
+        error_code=error_code,
+        error_message=error_message,
+        processing_started_at=processing_started_at,
+        processing_completed_at=processing_completed_at,
     )
     db.add(msg)
 

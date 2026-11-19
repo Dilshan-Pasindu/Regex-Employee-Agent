@@ -23,10 +23,16 @@ export async function sendChat(
   prompt: string,
   confirmed = false,
   sessionId?: string,
+  requestId?: string,
 ): Promise<ChatResponse> {
   return request<ChatResponse>('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ prompt, confirmed, session_id: sessionId }),
+    body: JSON.stringify({
+      prompt,
+      confirmed,
+      session_id: sessionId,
+      request_id: requestId,
+    }),
   });
 }
 

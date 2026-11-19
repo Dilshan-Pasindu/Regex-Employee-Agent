@@ -74,6 +74,11 @@ class MsgOut(BaseModel):
     success: Optional[bool]
     metadata_json: Optional[str] = None
     created_at: str
+    status: Optional[str] = "COMPLETED"
+    request_id: Optional[str] = None
+    error_code: Optional[str] = None
+    processing_started_at: Optional[str] = None
+    processing_completed_at: Optional[str] = None
 
     @classmethod
     def from_orm(cls, m) -> "MsgOut":
@@ -86,6 +91,11 @@ class MsgOut(BaseModel):
             success=m.success,
             metadata_json=getattr(m, "metadata_json", None),
             created_at=m.created_at.isoformat(),
+            status=getattr(m, "status", "COMPLETED"),
+            request_id=getattr(m, "request_id", None),
+            error_code=getattr(m, "error_code", None),
+            processing_started_at=m.processing_started_at.isoformat() if getattr(m, "processing_started_at", None) else None,
+            processing_completed_at=m.processing_completed_at.isoformat() if getattr(m, "processing_completed_at", None) else None,
         )
 
 
