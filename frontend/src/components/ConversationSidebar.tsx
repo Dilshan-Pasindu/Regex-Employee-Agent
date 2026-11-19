@@ -181,18 +181,6 @@ export function ConversationSidebar({
   const hoverBg = isDark ? '#1f1245' : '#f8f5ff';
   const inputBg = isDark ? '#1f1245' : '#f3eeff';
 
-  function formatDate(iso: string | null): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / 86400000);
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString();
-  }
-
   // Sorted conversations: pinned first (by pinned_at DESC), unpinned next (by last_message_at/updated_at DESC)
   const sortedConversations = [...conversations].sort((a, b) => {
     if (a.is_pinned && !b.is_pinned) return -1;
@@ -420,9 +408,6 @@ export function ConversationSidebar({
                         }}>
                           {conv.title}
                         </span>
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: textMuted, marginTop: 2 }}>
-                        {formatDate(conv.last_message_at || conv.updated_at)}
                       </div>
                     </div>
 
