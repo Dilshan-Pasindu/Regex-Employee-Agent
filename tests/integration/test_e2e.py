@@ -59,6 +59,7 @@ results = TestResult()
 async def chat(client: httpx.AsyncClient, prompt: str, conversation_id=None, confirmed=False):
     r = await client.post(f"{BASE}/api/chat", json={
         "prompt": prompt,
+        "session_id": conversation_id,
         "conversation_id": conversation_id,
         "confirmed": confirmed,
     }, timeout=30)
@@ -218,7 +219,11 @@ async def test_context_resolution(client):
         assert resp2.get("success"), f"Context follow-up failed: {resp2.get('message')}"
 
         steps = resp2.get("steps", [])
-        has_context = any("context" in s.lower() or "resolv" in s.lower() for s in steps)
+        has_context = any(
+            "context" in (s.get("label", "") if isinstance(s, dict) else str(s)).lower()
+            or "resolv" in (s.get("label", "") if isinstance(s, dict) else str(s)).lower()
+            for s in steps
+        )
         results.ok(f"Context resolution ({'context step found' if has_context else 'no explicit context step, but succeeded'})")
     except Exception as e:
         results.fail("Context resolution", str(e))

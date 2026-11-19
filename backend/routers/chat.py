@@ -35,7 +35,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
     from services import rust_client  # local import to allow env override in tests
 
     # 1. Resolve session and request IDs
-    session_id = body.session_id or str(uuid.uuid4())
+    session_id = body.session_id or body.conversation_id or str(uuid.uuid4())
     request_id = body.request_id or f"req_{uuid.uuid4().hex}"
     worker_id = f"worker_{uuid.uuid4().hex[:12]}"
     correlation_id = (
