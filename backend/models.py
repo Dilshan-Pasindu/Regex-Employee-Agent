@@ -51,6 +51,7 @@ class ChatResponse(BaseModel):
     status: Optional[str] = None
     error_code: Optional[str] = None
     correlation_id: Optional[str] = None
+    execution_plan: Optional[Dict[str, Any]] = None
 
 
 # ---------------------------------------------------------------------------

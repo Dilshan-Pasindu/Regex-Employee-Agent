@@ -87,6 +87,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             request_id=request_id,
             status="COMPLETED",
             correlation_id=correlation_id,
+            execution_plan=cached_response.get("execution_plan"),
         )
 
     if idemp_status == "PROCESSING":
@@ -225,6 +226,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             request_id=request_id,
             status="COMPLETED",
             correlation_id=correlation_id,
+            execution_plan=rust_resp.get("execution_plan"),
         )
 
         metadata_payload = {
@@ -240,6 +242,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             "success": rust_resp.get("success", False),
             "request_id": request_id,
             "correlation_id": correlation_id,
+            "execution_plan": rust_resp.get("execution_plan"),
         }
         metadata_str = json.dumps(metadata_payload)
 
@@ -282,28 +285,58 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
                 },
             )
 
-        # Track operation record
-        op_type = "WRITE" if body.confirmed else "READ"
-        op_rec = await outbox_service.record_operation_start(
-            db, request_id, conv.conversation_id, op_type, rust_resp.get("tool") or "none", rust_resp.get("params", {})
+        # 11. Track operation record & Write Safety (Phase 6)
+        requires_conf = rust_resp.get("requires_confirmation") is True
+        is_write = (
+            body.confirmed
+            or requires_conf
+            or (rust_resp.get("tool") in ["add_employee", "update_employee", "batch_update"])
         )
-        await outbox_service.record_operation_complete(
-            db, op_rec.operation_id, "COMPLETED" if rust_resp.get("success") else "FAILED", rust_resp.get("result")
+        op_type = "WRITE" if is_write else "READ"
+        op_rec = await outbox_service.record_operation_start(
+            db,
+            request_id,
+            conv.conversation_id,
+            op_type,
+            rust_resp.get("tool") or "none",
+            rust_resp.get("params", {}),
         )
 
-        # Emit MESSAGE_COMPLETED event
-        await outbox_service.record_outbox_event(
-            db=db,
-            event_type="MESSAGE_COMPLETED",
-            aggregate_id=conv.conversation_id,
-            payload={
-                "request_id": request_id,
-                "intent": rust_resp.get("intent"),
-                "tool": rust_resp.get("tool"),
-                "success": rust_resp.get("success", False),
-                "correlation_id": correlation_id,
-            },
+        if requires_conf and not body.confirmed:
+            op_status = "PENDING_CONFIRMATION"
+        else:
+            op_status = "COMPLETED" if rust_resp.get("success") else "FAILED"
+
+        await outbox_service.record_operation_complete(
+            db, op_rec.operation_id, op_status, rust_resp.get("result")
         )
+
+        # Emit Outbox Event based on execution vs confirmation
+        if requires_conf and not body.confirmed:
+            await outbox_service.record_outbox_event(
+                db=db,
+                event_type="OPERATION_AWAITING_CONFIRMATION",
+                aggregate_id=conv.conversation_id,
+                payload={
+                    "request_id": request_id,
+                    "tool": rust_resp.get("tool"),
+                    "params": rust_resp.get("params", {}),
+                    "correlation_id": correlation_id,
+                },
+            )
+        else:
+            await outbox_service.record_outbox_event(
+                db=db,
+                event_type="MESSAGE_COMPLETED",
+                aggregate_id=conv.conversation_id,
+                payload={
+                    "request_id": request_id,
+                    "intent": rust_resp.get("intent"),
+                    "tool": rust_resp.get("tool"),
+                    "success": rust_resp.get("success", False),
+                    "correlation_id": correlation_id,
+                },
+            )
         await db.commit()
 
         # 10. Mark idempotency record COMPLETED with cached response
