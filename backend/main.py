@@ -29,8 +29,14 @@ async def lifespan(app: FastAPI):
     print("  Initialising conversation tables in MySQL…")
     await init_db()
     print("  MySQL conversation tables ready.")
+    print("  Starting background Outbox worker…")
+    from services.outbox_worker import outbox_worker
+    outbox_worker.start()
+    print("  Outbox worker active.")
     print()
     yield
+    print("  Stopping Outbox worker…")
+    await outbox_worker.stop()
     print("  FastAPI backend shutting down.")
 
 

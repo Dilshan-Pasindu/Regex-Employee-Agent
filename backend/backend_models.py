@@ -130,3 +130,49 @@ class IdempotencyRecord(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
     conversation: Mapped["Conversation"] = relationship("Conversation")
+
+
+class OutboxEvent(Base):
+    __tablename__ = "OutboxEvents"
+
+    event_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=_new_uuid
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    aggregate_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    payload_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", nullable=False, index=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False, index=True)
+    locked_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class OperationRecord(Base):
+    __tablename__ = "OperationRecords"
+
+    operation_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=_new_uuid
+    )
+    request_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("Conversations.conversation_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    operation_type: Mapped[str] = mapped_column(String(50), nullable=False)  # READ, WRITE, BATCH_WRITE, UNDO
+    tool_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="STARTED", nullable=False, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+    conversation: Mapped["Conversation"] = relationship("Conversation")

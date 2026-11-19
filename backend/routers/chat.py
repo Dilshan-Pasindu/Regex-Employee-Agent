@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_db
 from models import ChatRequest, ChatResponse, StepTrace, ConversationEntry
-from services import conversation_service, reliability_service
+from services import conversation_service, reliability_service, outbox_service
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -125,6 +125,15 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             processing_started_at=start_time,
         )
 
+        # Emit Outbox event for message receipt
+        await outbox_service.record_outbox_event(
+            db=db,
+            event_type="MESSAGE_RECEIVED",
+            aggregate_id=conv.conversation_id,
+            payload={"request_id": request_id, "prompt": body.prompt},
+        )
+        await db.commit()
+
         # 6. Load persistent context & version (Phase 2)
         current_context, context_version, schema_version = await conversation_service.get_conversation_context(
             db, conv.conversation_id
@@ -158,7 +167,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
         returned_context = rust_resp.get("context")
         if returned_context is not None:
             try:
-                await conversation_service.save_conversation_context(
+                new_ver = await conversation_service.save_conversation_context(
                     db,
                     conv.conversation_id,
                     returned_context,
@@ -170,13 +179,19 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
                 _, latest_version, _ = await conversation_service.get_conversation_context(
                     db, conv.conversation_id
                 )
-                await conversation_service.save_conversation_context(
+                new_ver = await conversation_service.save_conversation_context(
                     db,
                     conv.conversation_id,
                     returned_context,
                     expected_version=latest_version,
                     schema_version=schema_version,
                 )
+            await outbox_service.record_outbox_event(
+                db=db,
+                event_type="CONTEXT_UPDATED",
+                aggregate_id=conv.conversation_id,
+                payload={"version": new_ver, "context_version": context_version},
+            )
 
         completed_time = datetime.now(timezone.utc)
         agent_text = rust_resp.get("message") or "Done."
@@ -232,6 +247,29 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             processing_started_at=start_time,
             processing_completed_at=completed_time,
         )
+
+        # Track operation record
+        op_type = "WRITE" if body.confirmed else "READ"
+        op_rec = await outbox_service.record_operation_start(
+            db, request_id, conv.conversation_id, op_type, rust_resp.get("tool") or "none", rust_resp.get("params", {})
+        )
+        await outbox_service.record_operation_complete(
+            db, op_rec.operation_id, "COMPLETED" if rust_resp.get("success") else "FAILED", rust_resp.get("result")
+        )
+
+        # Emit MESSAGE_COMPLETED event
+        await outbox_service.record_outbox_event(
+            db=db,
+            event_type="MESSAGE_COMPLETED",
+            aggregate_id=conv.conversation_id,
+            payload={
+                "request_id": request_id,
+                "intent": rust_resp.get("intent"),
+                "tool": rust_resp.get("tool"),
+                "success": rust_resp.get("success", False),
+            },
+        )
+        await db.commit()
 
         # 10. Mark idempotency record COMPLETED with cached response
         await reliability_service.complete_idempotency_record(

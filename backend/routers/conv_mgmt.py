@@ -142,6 +142,24 @@ async def search_convs(
     return {"conversations": [ConvOut.from_orm(c) for c in convs]}
 
 
+@router.get("/outbox/status")
+async def get_outbox_status(db: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func
+    from backend_models import OutboxEvent, OperationRecord
+    counts_res = await db.execute(
+        select(OutboxEvent.status, func.count()).group_by(OutboxEvent.status)
+    )
+    event_counts = {status: count for status, count in counts_res.all()}
+    op_counts_res = await db.execute(
+        select(OperationRecord.status, func.count()).group_by(OperationRecord.status)
+    )
+    op_counts = {status: count for status, count in op_counts_res.all()}
+    return {
+        "outbox_events": event_counts,
+        "operation_records": op_counts,
+    }
+
+
 @router.get("/{conversation_id}")
 async def get_conv(conversation_id: str, db: AsyncSession = Depends(get_db)):
     conv = await get_conversation(db, conversation_id, DEFAULT_USER)
