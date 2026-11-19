@@ -8,6 +8,21 @@ export interface StepTrace {
   value: unknown;
 }
 
+export interface ExecutionPlanStep {
+  step_number: number;
+  description: string;
+  tool_name?: string | null;
+  arguments?: Record<string, unknown> | null;
+}
+
+export interface ExecutionPlan {
+  intent_label?: string;
+  steps: ExecutionPlanStep[];
+  requires_confirmation?: boolean;
+  extracted_conditions?: Record<string, unknown>;
+  requested_fields?: string[];
+}
+
 export interface ChatResponse {
   session_id: string;
   prompt: string;
@@ -23,6 +38,8 @@ export interface ChatResponse {
   request_id?: string;
   status?: string;
   error_code?: string;
+  correlation_id?: string;
+  execution_plan?: ExecutionPlan | null;
 }
 
 export interface ChatMessage {

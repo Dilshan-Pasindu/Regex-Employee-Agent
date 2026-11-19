@@ -1,31 +1,75 @@
 // =============================================================================
-// components/ChatPanel.tsx — Animated chat timeline (vibrant redesign)
+// components/ChatPanel.tsx — Animated chat timeline (Phase 7 refinements)
+// Adds: ExecutionPlan panel, Write-Safety amber badge, Error recovery UX,
+//       correlation ID footer, improved step icons
 // =============================================================================
 
 import { useRef, useEffect, useState } from 'react';
-import { Lightbulb, ArrowDown } from 'lucide-react';
+import { Lightbulb, ArrowDown, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import type { ChatMessage } from '../types';
-import { StepTracePanel } from './StepTrace';
+import { StepTracePanel, ExecutionPlanPanel } from './StepTrace';
 import { EmployeeTable } from './EmployeeTable';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import botAvatar from '../assets/bot-avatar.jpg';
 
 // ---------- Intent badge --------------------------------------------------
 function IntentBadge({ intent }: { intent: string }) {
-  const isWrite = intent.startsWith('add') || intent.startsWith('update');
+  const isWrite = intent.startsWith('add') || intent.startsWith('update') || intent.startsWith('batch');
+  const isUnknown = intent === 'unknown';
+  const color = isUnknown ? '#6b7280' : isWrite ? '#d97706' : '#7c3aed';
+  const bg = isUnknown ? 'rgba(107,114,128,0.12)' : isWrite ? 'rgba(245,158,11,0.12)' : 'rgba(124,58,237,0.12)';
+  const border = isUnknown ? 'rgba(107,114,128,0.25)' : isWrite ? 'rgba(245,158,11,0.3)' : 'rgba(124,58,237,0.3)';
   return (
     <span style={{
       display: 'inline-block',
-      fontSize: '0.68rem',
-      fontWeight: 700,
-      fontFamily: 'monospace',
-      padding: '1px 8px',
-      borderRadius: 99,
-      background: isWrite ? 'rgba(245,158,11,0.15)' : 'rgba(124,58,237,0.15)',
-      color: isWrite ? '#d97706' : '#7c3aed',
-      border: `1px solid ${isWrite ? 'rgba(245,158,11,0.3)' : 'rgba(124,58,237,0.3)'}`,
+      fontSize: '0.68rem', fontWeight: 700, fontFamily: 'monospace',
+      padding: '1px 8px', borderRadius: 99,
+      background: bg, color, border: `1px solid ${border}`,
     }}>
       {intent}
+    </span>
+  );
+}
+
+// ---------- Write-safety badge (amber) ------------------------------------
+function PendingConfirmationBadge() {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      fontSize: '0.72rem', fontWeight: 700,
+      padding: '3px 10px', borderRadius: 8,
+      background: 'rgba(217,119,6,0.1)',
+      color: '#d97706',
+      border: '1px solid rgba(217,119,6,0.3)',
+      marginBottom: 8,
+    }}>
+      <AlertTriangle size={12} />
+      Awaiting Confirmation — Write not executed yet
+    </div>
+  );
+}
+
+// ---------- Success / failure pill ----------------------------------------
+function StatusPill({ success }: { success: boolean }) {
+  return success ? (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: '0.66rem', fontWeight: 700,
+      padding: '1px 7px', borderRadius: 99,
+      background: 'rgba(5,150,105,0.1)', color: '#059669',
+      border: '1px solid rgba(5,150,105,0.25)',
+    }}>
+      <CheckCircle2 size={10} /> OK
+    </span>
+  ) : (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: '0.66rem', fontWeight: 700,
+      padding: '1px 7px', borderRadius: 99,
+      background: 'rgba(220,38,38,0.1)', color: '#dc2626',
+      border: '1px solid rgba(220,38,38,0.25)',
+    }}>
+      <XCircle size={10} /> Failed
     </span>
   );
 }
@@ -35,24 +79,17 @@ function TypingIndicator() {
   return (
     <div className="flex gap-3 items-start msg-enter">
       <img
-        src={botAvatar}
-        alt="Bot"
+        src={botAvatar} alt="Bot"
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 11,
-          objectFit: 'cover',
-          flexShrink: 0,
-          marginTop: 2,
+          width: 34, height: 34, borderRadius: 11, objectFit: 'cover',
+          flexShrink: 0, marginTop: 2,
           boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
           border: '1.5px solid rgba(124,58,237,0.3)',
         }}
       />
       <div style={{
-        background: 'var(--bot-bubble)',
-        color: 'var(--bot-text)',
-        borderRadius: '18px 18px 18px 4px',
-        padding: '12px 16px',
+        background: 'var(--bot-bubble)', color: 'var(--bot-text)',
+        borderRadius: '18px 18px 18px 4px', padding: '12px 16px',
         display: 'flex', alignItems: 'center', gap: 4,
       }}>
         <div className="dot-bounce" aria-label="Thinking">
@@ -69,46 +106,58 @@ function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (te
 
   if (msg.pending) return <TypingIndicator />;
 
+  const isPendingConfirm = r?.requires_confirmation === true;
+  const isError = r?.success === false && !isPendingConfirm;
+
   return (
     <div className="flex gap-3 items-start msg-enter">
       <img
-        src={botAvatar}
-        alt="Bot"
+        src={botAvatar} alt="Bot"
         style={{
-          width: 34,
-          height: 34,
-          borderRadius: 11,
-          objectFit: 'cover',
-          flexShrink: 0,
-          marginTop: 2,
+          width: 34, height: 34, borderRadius: 11, objectFit: 'cover',
+          flexShrink: 0, marginTop: 2,
           boxShadow: '0 2px 8px rgba(124,58,237,0.25)',
           border: '1.5px solid rgba(124,58,237,0.3)',
         }}
       />
 
       <div style={{
-        background: 'var(--bot-bubble)',
+        background: isError ? 'rgba(220,38,38,0.05)' : isPendingConfirm ? 'rgba(217,119,6,0.05)' : 'var(--bot-bubble)',
         color: 'var(--bot-text)',
         borderRadius: '18px 18px 18px 4px',
         padding: '12px 16px',
-        maxWidth: 680,
+        maxWidth: 700,
         width: '100%',
-        boxShadow: '0 1px 6px rgba(0,0,0,0.06)',
+        boxShadow: isError
+          ? '0 1px 6px rgba(220,38,38,0.1)'
+          : isPendingConfirm
+          ? '0 1px 6px rgba(217,119,6,0.1)'
+          : '0 1px 6px rgba(0,0,0,0.06)',
+        border: isError
+          ? '1px solid rgba(220,38,38,0.2)'
+          : isPendingConfirm
+          ? '1px solid rgba(217,119,6,0.2)'
+          : 'none',
       }}>
-        {/* Intent badge */}
+
+        {/* Write-safety banner */}
+        {isPendingConfirm && <PendingConfirmationBadge />}
+
+        {/* Intent + tool row */}
         {r?.intent && r.intent !== 'unknown' && (
-          <div style={{ marginBottom: 8 }}>
+          <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
             <IntentBadge intent={r.intent} />
             {r.tool && (
-              <span style={{ marginLeft: 8, fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                 → {r.tool}
               </span>
             )}
+            {r.success !== undefined && <StatusPill success={r.success} />}
           </div>
         )}
 
         {/* Main message */}
-        <div style={{ color: r?.success === false ? '#ef4444' : 'var(--bot-text)' }}>
+        <div style={{ color: isError ? '#ef4444' : 'var(--bot-text)' }}>
           <MarkdownRenderer content={msg.content} />
         </div>
 
@@ -125,13 +174,10 @@ function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (te
                   color: 'var(--text)',
                   borderRadius: 99,
                   padding: '5px 14px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
+                  fontSize: '0.78rem', fontWeight: 600,
                   fontFamily: 'var(--font-body)',
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
+                  display: 'flex', alignItems: 'center', gap: 6,
                   transition: 'all 0.15s',
                   boxShadow: '0 1px 4px rgba(124,58,237,0.1)',
                 }}
@@ -158,13 +204,23 @@ function AgentBubble({ msg, onChipClick }: { msg: ChatMessage; onChipClick?: (te
           <EmployeeTable data={r.result} />
         )}
 
-        {/* Step trace */}
-        {r?.steps && r.steps.length > 0 && (
-          <StepTracePanel steps={r.steps} />
-        )}
+        {/* Execution plan accordion (Phase 7) */}
+        {r?.execution_plan && <ExecutionPlanPanel plan={r.execution_plan} />}
 
-        <div style={{ marginTop: 6, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-          {msg.timestamp.toLocaleTimeString()}
+        {/* Step trace accordion */}
+        {r?.steps && r.steps.length > 0 && <StepTracePanel steps={r.steps} />}
+
+        {/* Footer row: timestamp + correlation ID */}
+        <div style={{
+          marginTop: 6, display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: '0.65rem', color: 'var(--text-muted)',
+        }}>
+          <span>{msg.timestamp.toLocaleTimeString()}</span>
+          {r?.correlation_id && (
+            <span style={{ fontFamily: 'monospace', opacity: 0.6 }} title="Correlation ID">
+              corr:{r.correlation_id.slice(0, 12)}
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -222,24 +278,16 @@ function WelcomeScreen({ onChip }: { onChip: (text: string) => void }) {
           src={botAvatar}
           alt="Employee Agent Logo"
           style={{
-            width: 88,
-            height: 88,
-            borderRadius: 28,
-            objectFit: 'cover',
+            width: 88, height: 88, borderRadius: 28, objectFit: 'cover',
             boxShadow: '0 12px 36px rgba(124,58,237,0.35)',
             border: '3px solid rgba(255,255,255,0.8)',
             display: 'block',
           }}
         />
         <div style={{
-          position: 'absolute',
-          bottom: 2,
-          right: 2,
-          width: 18,
-          height: 18,
-          borderRadius: '50%',
-          background: '#10b981',
-          border: '3px solid var(--surface)',
+          position: 'absolute', bottom: 2, right: 2,
+          width: 18, height: 18, borderRadius: '50%',
+          background: '#10b981', border: '3px solid var(--surface)',
         }} />
       </div>
 
@@ -263,13 +311,10 @@ function WelcomeScreen({ onChip }: { onChip: (text: string) => void }) {
               background: 'var(--surface)',
               border: '1.5px solid var(--border)',
               color: 'var(--text)',
-              borderRadius: 99,
-              padding: '8px 18px',
-              fontSize: '0.82rem',
-              fontWeight: 600,
+              borderRadius: 99, padding: '8px 18px',
+              fontSize: '0.82rem', fontWeight: 600,
               fontFamily: 'var(--font-body)',
-              cursor: 'pointer',
-              transition: 'all 0.18s',
+              cursor: 'pointer', transition: 'all 0.18s',
               boxShadow: '0 1px 6px rgba(124,58,237,0.08)',
             }}
             onMouseEnter={e => {
@@ -337,12 +382,10 @@ export function ChatPanel({ messages, onChipClick }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Auto-scroll to bottom on new message
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Show "scroll to bottom" FAB when user scrolls up
   function handleScroll() {
     const el = scrollRef.current;
     if (!el) return;
@@ -364,12 +407,9 @@ export function ChatPanel({ messages, onChipClick }: Props) {
         ref={scrollRef}
         onScroll={handleScroll}
         style={{
-          height: '100%',
-          overflowY: 'auto',
+          height: '100%', overflowY: 'auto',
           padding: '20px 16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
+          display: 'flex', flexDirection: 'column', gap: 14,
         }}
       >
         {messages.map(msg =>
@@ -380,30 +420,23 @@ export function ChatPanel({ messages, onChipClick }: Props) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Scroll-to-bottom button */}
+      {/* Scroll-to-bottom FAB */}
       {showScrollBtn && (
         <button
           onClick={scrollToBottom}
           aria-label="Scroll to latest message"
           style={{
-            position: 'absolute',
-            bottom: 16,
-            left: '50%',
+            position: 'absolute', bottom: 16, left: '50%',
             transform: 'translateX(-50%)',
             background: 'linear-gradient(135deg,#7c3aed,#db2777)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 99,
+            color: '#fff', border: 'none', borderRadius: 99,
             padding: '6px 16px',
-            fontSize: '0.78rem',
-            fontWeight: 700,
+            fontSize: '0.78rem', fontWeight: 700,
             fontFamily: 'var(--font-body)',
             cursor: 'pointer',
             boxShadow: '0 4px 16px rgba(124,58,237,0.4)',
             transition: 'opacity 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
+            display: 'flex', alignItems: 'center', gap: 6,
           }}
         >
           <ArrowDown size={14} />

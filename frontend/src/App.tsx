@@ -1,7 +1,7 @@
 // =============================================================================
-// App.tsx — Root application shell (Phase 1: Persistent Chat History)
-// New: ConversationSidebar + MySQL-backed conversation switching
-// All existing agentic logic (voice, confirmation, tools) preserved.
+// App.tsx — Root application shell (Phase 7: React Interface Refinements)
+// Adds: execution_plan wiring, toast error system, 429/409 recovery,
+//       improved confirmation flow, status badge on message reload.
 // =============================================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -12,7 +12,9 @@ import {
   Moon, 
   Wrench, 
   SquarePen, 
-  Send 
+  Send,
+  AlertCircle,
+  X,
 } from 'lucide-react';
 import { ChatPanel } from './components/ChatPanel';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -30,6 +32,45 @@ import './index.css';
 
 function nanoid() {
   return Math.random().toString(36).slice(2, 11);
+}
+
+// ---------- Toast notification system -------------------------------------
+interface Toast { id: string; message: string; kind: 'error' | 'warn' | 'info' }
+
+function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  if (toasts.length === 0) return null;
+  return (
+    <div style={{
+      position: 'fixed', top: 60, right: 16, zIndex: 9999,
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      {toasts.map(t => (
+        <div
+          key={t.id}
+          style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            background: t.kind === 'error' ? '#fef2f2' : t.kind === 'warn' ? '#fffbeb' : '#eff6ff',
+            border: `1px solid ${t.kind === 'error' ? '#fecaca' : t.kind === 'warn' ? '#fde68a' : '#bfdbfe'}`,
+            color: t.kind === 'error' ? '#dc2626' : t.kind === 'warn' ? '#d97706' : '#2563eb',
+            borderRadius: 10, padding: '10px 12px',
+            fontSize: '0.8rem', fontWeight: 600,
+            maxWidth: 320,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+            animation: 'msg-enter 0.2s ease',
+          }}
+        >
+          <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span style={{ flex: 1 }}>{t.message}</span>
+          <button
+            onClick={() => onDismiss(t.id)}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'inherit', opacity: 0.6 }}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function persistedToChat(m: PersistedMessage): ChatMessage {
@@ -52,6 +93,8 @@ function persistedToChat(m: PersistedMessage): ChatMessage {
           requires_confirmation: meta.requires_confirmation,
           message: content,
           suggestions: meta.suggestions || [],
+          execution_plan: meta.execution_plan ?? undefined,
+          correlation_id: meta.correlation_id ?? undefined,
         };
       } catch (err) {
         console.warn('Failed to parse metadata_json', err);
@@ -102,6 +145,15 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarRefresh, setSidebarRefresh] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Toast state
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  function addToast(message: string, kind: 'error' | 'warn' | 'info' = 'error') {
+    const id = nanoid();
+    setToasts(prev => [...prev, { id, message, kind }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
+  }
+  function dismissToast(id: string) { setToasts(prev => prev.filter(t => t.id !== id)); }
 
   const toggleVoiceInput = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -228,12 +280,21 @@ export default function App() {
       // Refresh sidebar to show updated last_message_at
       setSidebarRefresh(r => r + 1);
     } catch (err) {
-      updateLastAgentMessage({
-        id: agentId,
-        content: `Error: ${err instanceof Error ? err.message : String(err)}`,
-        pending: false,
-        response: undefined,
-      });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      if (errMsg.includes('429')) {
+        addToast('Conversation is busy processing another request. Please wait a moment.', 'warn');
+        updateLastAgentMessage({ id: agentId, content: '', pending: false, response: undefined });
+      } else if (errMsg.includes('409')) {
+        addToast('This exact request is already being processed.', 'warn');
+        updateLastAgentMessage({ id: agentId, content: '', pending: false, response: undefined });
+      } else {
+        updateLastAgentMessage({
+          id: agentId,
+          content: `Error: ${errMsg}`,
+          pending: false,
+          response: undefined,
+        });
+      }
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -377,6 +438,7 @@ export default function App() {
         <ConfirmationModal intent={confirmation.intent} params={confirmation.params} onConfirm={handleConfirm} onCancel={handleCancel} />
       )}
       <ToolCatalogDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

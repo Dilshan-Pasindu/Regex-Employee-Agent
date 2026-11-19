@@ -24,9 +24,13 @@ export async function sendChat(
   confirmed = false,
   sessionId?: string,
   requestId?: string,
+  correlationId?: string,
 ): Promise<ChatResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (correlationId) headers['X-Correlation-ID'] = correlationId;
   return request<ChatResponse>('/api/chat', {
     method: 'POST',
+    headers,
     body: JSON.stringify({
       prompt,
       confirmed,
@@ -111,4 +115,13 @@ export async function getConversationMessages(
   return request<{ conversation_id: string; messages: PersistedMessage[]; page: number; page_size: number }>(
     `/api/conversations/${id}/messages?${params}`,
   );
+}
+
+export async function getConversationSnapshots(
+  id: string,
+  limit = 20,
+): Promise<{ conversation_id: string; snapshots: Array<{ snapshot_id: string; context_version: number; message_sequence_number: number; schema_version: number; snapshot: Record<string, unknown>; created_at: string }> }> {
+  return request<{ conversation_id: string; snapshots: unknown[] }>(
+    `/api/conversations/${id}/snapshots?limit=${limit}`,
+  ) as Promise<{ conversation_id: string; snapshots: Array<{ snapshot_id: string; context_version: number; message_sequence_number: number; schema_version: number; snapshot: Record<string, unknown>; created_at: string }> }>;
 }
