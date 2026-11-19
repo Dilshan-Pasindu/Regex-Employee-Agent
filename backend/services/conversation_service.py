@@ -13,7 +13,7 @@ from typing import Optional
 from sqlalchemy import select, func, or_, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend_models import Conversation, Message, ConversationContext
+from backend_models import Conversation, Message, ConversationContext, ContextSnapshot
 
 
 def _utcnow() -> datetime:
@@ -340,6 +340,94 @@ async def save_conversation_context(
 
     await db.commit()
     return expected_version + 1
+
+
+# ---------------------------------------------------------------------------
+# Context Snapshots & Checkpoints (Phase 5)
+# ---------------------------------------------------------------------------
+
+async def create_context_snapshot(
+    db: AsyncSession,
+    conversation_id: str,
+    context_dict: dict,
+    context_version: int,
+    message_sequence_number: int,
+    schema_version: int = 1,
+) -> ContextSnapshot:
+    """Creates a deterministic snapshot/checkpoint of the conversation context."""
+    now = _utcnow()
+    snapshot = ContextSnapshot(
+        conversation_id=conversation_id,
+        context_version=context_version,
+        message_sequence_number=message_sequence_number,
+        schema_version=schema_version,
+        snapshot_json=json.dumps(context_dict, default=str),
+        created_at=now,
+    )
+    db.add(snapshot)
+    await db.commit()
+    await db.refresh(snapshot)
+    return snapshot
+
+
+async def get_latest_context_snapshot(
+    db: AsyncSession, conversation_id: str
+) -> tuple[dict, int, int] | None:
+    """
+    Retrieves the most recent context snapshot for a conversation.
+    Returns (snapshot_dict, context_version, message_sequence_number) or None.
+    """
+    res = await db.execute(
+        select(ContextSnapshot)
+        .where(ContextSnapshot.conversation_id == conversation_id)
+        .order_by(ContextSnapshot.message_sequence_number.desc())
+        .limit(1)
+    )
+    row = res.scalar_one_or_none()
+    if not row:
+        return None
+    try:
+        data = json.loads(row.snapshot_json)
+    except Exception:
+        data = {}
+    return data, row.context_version, row.message_sequence_number
+
+
+async def list_context_snapshots(
+    db: AsyncSession, conversation_id: str, limit: int = 50
+) -> list[ContextSnapshot]:
+    """Retrieves context snapshots for a conversation ordered by message sequence number."""
+    res = await db.execute(
+        select(ContextSnapshot)
+        .where(ContextSnapshot.conversation_id == conversation_id)
+        .order_by(ContextSnapshot.message_sequence_number.asc())
+        .limit(limit)
+    )
+    return list(res.scalars().all())
+
+
+# ---------------------------------------------------------------------------
+# Lightweight CQRS Facades (Phase 5)
+# ---------------------------------------------------------------------------
+
+class ConversationCommandService:
+    create = staticmethod(create_conversation)
+    rename = staticmethod(rename_conversation)
+    pin = staticmethod(pin_conversation)
+    delete = staticmethod(delete_conversation)
+    add_message = staticmethod(add_message)
+    save_context = staticmethod(save_conversation_context)
+    create_snapshot = staticmethod(create_context_snapshot)
+
+
+class ConversationQueryService:
+    get = staticmethod(get_conversation)
+    list = staticmethod(list_conversations)
+    search = staticmethod(search_conversations)
+    get_messages = staticmethod(get_messages)
+    get_context = staticmethod(get_conversation_context)
+    get_latest_snapshot = staticmethod(get_latest_context_snapshot)
+    list_snapshots = staticmethod(list_context_snapshots)
 
 
 # ---------------------------------------------------------------------------

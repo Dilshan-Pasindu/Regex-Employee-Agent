@@ -12,9 +12,11 @@
 # =============================================================================
 from __future__ import annotations
 
+import json
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db import get_db
@@ -28,6 +30,7 @@ from services.conversation_service import (
     list_conversations,
     search_conversations,
     get_conversation_context,
+    list_context_snapshots,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversation-management"])
@@ -203,6 +206,29 @@ async def get_conv_context(conversation_id: str, db: AsyncSession = Depends(get_
         "version": version,
         "schema_version": schema_version,
         "context": data,
+    }
+
+
+@router.get("/{conversation_id}/snapshots")
+async def get_conv_snapshots(
+    conversation_id: str,
+    limit: int = Query(50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    snapshots = await list_context_snapshots(db, conversation_id, limit)
+    return {
+        "conversation_id": conversation_id,
+        "snapshots": [
+            {
+                "snapshot_id": s.snapshot_id,
+                "context_version": s.context_version,
+                "message_sequence_number": s.message_sequence_number,
+                "schema_version": s.schema_version,
+                "snapshot": json.loads(s.snapshot_json) if s.snapshot_json else {},
+                "created_at": s.created_at.isoformat(),
+            }
+            for s in snapshots
+        ],
     }
 
 

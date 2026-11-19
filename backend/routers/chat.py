@@ -38,6 +38,12 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
     session_id = body.session_id or str(uuid.uuid4())
     request_id = body.request_id or f"req_{uuid.uuid4().hex}"
     worker_id = f"worker_{uuid.uuid4().hex[:12]}"
+    correlation_id = (
+        getattr(request.state, "correlation_id", None)
+        or request.headers.get("X-Correlation-ID")
+        or f"corr_{uuid.uuid4().hex[:12]}"
+    )
+    logging.info("Processing chat request %s (correlation_id=%s) for session=%s", request_id, correlation_id, session_id)
 
     # 2. Check / create conversation in MySQL
     conv = await conversation_service.get_conversation(db, session_id, DEFAULT_USER)
@@ -80,6 +86,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             suggestions=cached_response.get("suggestions"),
             request_id=request_id,
             status="COMPLETED",
+            correlation_id=correlation_id,
         )
 
     if idemp_status == "PROCESSING":
@@ -130,7 +137,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             db=db,
             event_type="MESSAGE_RECEIVED",
             aggregate_id=conv.conversation_id,
-            payload={"request_id": request_id, "prompt": body.prompt},
+            payload={"request_id": request_id, "prompt": body.prompt, "correlation_id": correlation_id},
         )
         await db.commit()
 
@@ -139,7 +146,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             db, conv.conversation_id
         )
 
-        # 7. Call Rust HTTP service with persistent context
+        # 7. Call Rust HTTP service with persistent context and correlation_id (Phase 2 & 5)
         try:
             rust_resp = await rust_client.process_prompt(
                 prompt=body.prompt,
@@ -147,6 +154,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
                 session_id=session_id,
                 context=current_context if current_context else None,
                 context_version=context_version if context_version > 0 else None,
+                correlation_id=correlation_id,
             )
         except httpx.ConnectError:
             await reliability_service.complete_idempotency_record(
@@ -216,6 +224,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             suggestions=rust_resp.get("suggestions"),
             request_id=request_id,
             status="COMPLETED",
+            correlation_id=correlation_id,
         )
 
         metadata_payload = {
@@ -230,11 +239,12 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             "requires_confirmation": rust_resp.get("requires_confirmation"),
             "success": rust_resp.get("success", False),
             "request_id": request_id,
+            "correlation_id": correlation_id,
         }
         metadata_str = json.dumps(metadata_payload)
 
         # 9. Persist assistant message as COMPLETED
-        await conversation_service.add_message(
+        assistant_msg = await conversation_service.add_message(
             db=db,
             conversation_id=conv.conversation_id,
             role="assistant",
@@ -247,6 +257,30 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
             processing_started_at=start_time,
             processing_completed_at=completed_time,
         )
+
+        # 10. Checkpoint context snapshot (Phase 5)
+        # Snapshots created every 5 messages or on initial bootstrap turns (seq <= 2)
+        active_context = returned_context if returned_context is not None else current_context
+        active_version = new_ver if returned_context is not None else context_version
+        if active_context and (assistant_msg.sequence_number % 5 == 0 or assistant_msg.sequence_number <= 2):
+            await conversation_service.create_context_snapshot(
+                db=db,
+                conversation_id=conv.conversation_id,
+                context_dict=active_context,
+                context_version=active_version,
+                message_sequence_number=assistant_msg.sequence_number,
+                schema_version=schema_version,
+            )
+            await outbox_service.record_outbox_event(
+                db=db,
+                event_type="CONTEXT_SNAPSHOT_CREATED",
+                aggregate_id=conv.conversation_id,
+                payload={
+                    "context_version": active_version,
+                    "message_sequence_number": assistant_msg.sequence_number,
+                    "correlation_id": correlation_id,
+                },
+            )
 
         # Track operation record
         op_type = "WRITE" if body.confirmed else "READ"
@@ -267,6 +301,7 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
                 "intent": rust_resp.get("intent"),
                 "tool": rust_resp.get("tool"),
                 "success": rust_resp.get("success", False),
+                "correlation_id": correlation_id,
             },
         )
         await db.commit()

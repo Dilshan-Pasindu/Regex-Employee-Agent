@@ -48,6 +48,9 @@ class Conversation(Base):
     context: Mapped["ConversationContext | None"] = relationship(
         "ConversationContext", back_populates="conversation", uselist=False, cascade="all, delete-orphan"
     )
+    snapshots: Mapped[list["ContextSnapshot"]] = relationship(
+        "ContextSnapshot", back_populates="conversation", cascade="all, delete-orphan", order_by="ContextSnapshot.message_sequence_number"
+    )
 
 
 class ConversationContext(Base):
@@ -176,3 +179,24 @@ class OperationRecord(Base):
     attempt_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship("Conversation")
+
+
+class ContextSnapshot(Base):
+    __tablename__ = "ContextSnapshots"
+
+    snapshot_id: Mapped[str] = mapped_column(
+        String(36), primary_key=True, default=_new_uuid
+    )
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("Conversations.conversation_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    context_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    message_sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    snapshot_json: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="snapshots")

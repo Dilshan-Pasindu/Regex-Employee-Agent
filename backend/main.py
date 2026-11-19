@@ -14,6 +14,9 @@ load_dotenv()
 from db import init_db
 from routers import chat, tools, health
 from routers import conv_mgmt
+from telemetry import CorrelationIdMiddleware, setup_telemetry_logging
+
+setup_telemetry_logging()
 
 
 @asynccontextmanager
@@ -60,6 +63,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 # CORS — allow React dev server on :5173 (and any other local origin)
 # ---------------------------------------------------------------------------
+app.add_middleware(CorrelationIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
