@@ -27,6 +27,7 @@ from services.conversation_service import (
     get_messages,
     list_conversations,
     search_conversations,
+    get_conversation_context,
 )
 
 router = APIRouter(prefix="/api/conversations", tags=["conversation-management"])
@@ -164,6 +165,17 @@ async def delete_conv(conversation_id: str, db: AsyncSession = Depends(get_db)):
     if not ok:
         raise HTTPException(404, "Conversation not found")
     return {"message": "Conversation deleted"}
+
+
+@router.get("/{conversation_id}/context")
+async def get_conv_context(conversation_id: str, db: AsyncSession = Depends(get_db)):
+    data, version, schema_version = await get_conversation_context(db, conversation_id)
+    return {
+        "conversation_id": conversation_id,
+        "version": version,
+        "schema_version": schema_version,
+        "context": data,
+    }
 
 
 @router.get("/{conversation_id}/messages")

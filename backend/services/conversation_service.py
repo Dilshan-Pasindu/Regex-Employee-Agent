@@ -5,14 +5,15 @@
 # =============================================================================
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select, func, or_, update
+from sqlalchemy import select, func, or_, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend_models import Conversation, Message
+from backend_models import Conversation, Message, ConversationContext
 
 
 def _utcnow() -> datetime:
@@ -109,6 +110,12 @@ async def delete_conversation(db: AsyncSession, conversation_id: str, user_id: s
         return False
     conv.is_deleted = True
     conv.updated_at = _utcnow()
+    # Clean up associated context
+    await db.execute(
+        delete(ConversationContext).where(
+            ConversationContext.conversation_id == conversation_id
+        )
+    )
     await db.commit()
     return True
 
@@ -219,6 +226,108 @@ async def search_conversations(
     )
     result = await db.execute(q)
     return list(result.scalars().all())
+
+
+# ---------------------------------------------------------------------------
+# Context Persistence & Optimistic Concurrency Control (Phase 2)
+# ---------------------------------------------------------------------------
+
+class ConcurrencyConflictError(Exception):
+    def __init__(self, conversation_id: str, expected_version: int, actual_version: int):
+        super().__init__(
+            f"Conflict: Conversation {conversation_id} context was modified concurrently. "
+            f"Expected version {expected_version}, but found {actual_version}."
+        )
+        self.conversation_id = conversation_id
+        self.expected_version = expected_version
+        self.actual_version = actual_version
+
+
+async def get_conversation_context(
+    db: AsyncSession, conversation_id: str
+) -> tuple[dict, int, int]:
+    """
+    Returns (context_dict, version, schema_version).
+    If no context row exists yet, returns ({}, 0, 1).
+    """
+    result = await db.execute(
+        select(ConversationContext).where(
+            ConversationContext.conversation_id == conversation_id
+        )
+    )
+    ctx_row = result.scalar_one_or_none()
+    if not ctx_row:
+        return {}, 0, 1
+    try:
+        data = json.loads(ctx_row.context_json) if ctx_row.context_json else {}
+    except Exception:
+        data = {}
+    return data, ctx_row.version, ctx_row.schema_version
+
+
+async def save_conversation_context(
+    db: AsyncSession,
+    conversation_id: str,
+    context_dict: dict,
+    expected_version: int,
+    schema_version: int = 1,
+) -> int:
+    """
+    Saves conversation context using optimistic concurrency control.
+    - If expected_version == 0, creates the initial row at version 1.
+    - If expected_version > 0, conditionally updates row where version == expected_version.
+    Raises ConcurrencyConflictError if a concurrent update modified the row.
+    Returns the new version number.
+    """
+    now = _utcnow()
+    json_str = json.dumps(context_dict)
+
+    if expected_version == 0:
+        existing = await db.execute(
+            select(ConversationContext).where(
+                ConversationContext.conversation_id == conversation_id
+            )
+        )
+        existing_row = existing.scalar_one_or_none()
+        if existing_row:
+            raise ConcurrencyConflictError(conversation_id, expected_version, existing_row.version)
+
+        ctx_row = ConversationContext(
+            conversation_id=conversation_id,
+            version=1,
+            schema_version=schema_version,
+            context_json=json_str,
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(ctx_row)
+        await db.commit()
+        return 1
+
+    res = await db.execute(
+        update(ConversationContext)
+        .where(
+            ConversationContext.conversation_id == conversation_id,
+            ConversationContext.version == expected_version,
+        )
+        .values(
+            context_json=json_str,
+            version=ConversationContext.version + 1,
+            schema_version=schema_version,
+            updated_at=now,
+        )
+    )
+    if res.rowcount == 0:
+        actual_res = await db.execute(
+            select(ConversationContext.version).where(
+                ConversationContext.conversation_id == conversation_id
+            )
+        )
+        actual_version = actual_res.scalar() or 0
+        raise ConcurrencyConflictError(conversation_id, expected_version, actual_version)
+
+    await db.commit()
+    return expected_version + 1
 
 
 # ---------------------------------------------------------------------------

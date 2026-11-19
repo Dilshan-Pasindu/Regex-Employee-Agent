@@ -88,6 +88,14 @@ export async function deleteConversation(id: string): Promise<void> {
   await request<unknown>(`/api/conversations/${id}`, { method: 'DELETE' });
 }
 
+export async function getConversationContext(
+  id: string,
+): Promise<{ conversation_id: string; version: number; schema_version: number; context: Record<string, unknown> }> {
+  return request<{ conversation_id: string; version: number; schema_version: number; context: Record<string, unknown> }>(
+    `/api/conversations/${id}/context`,
+  );
+}
+
 export async function getConversationMessages(
   id: string,
   page = 1,

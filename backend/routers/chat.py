@@ -43,9 +43,20 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
         db, conv.conversation_id, "user", body.prompt
     )
 
-    # Call Rust HTTP service
+    # Phase 2: Load current persistent conversation context from MySQL
+    current_context, context_version, schema_version = await conversation_service.get_conversation_context(
+        db, conv.conversation_id
+    )
+
+    # Call Rust HTTP service with persistent context
     try:
-        rust_resp = await rust_client.process_prompt(body.prompt, body.confirmed, session_id)
+        rust_resp = await rust_client.process_prompt(
+            body.prompt,
+            body.confirmed,
+            session_id,
+            context=current_context if current_context else None,
+            context_version=context_version if context_version > 0 else None,
+        )
     except httpx.ConnectError:
         raise HTTPException(
             status_code=503,
@@ -54,6 +65,30 @@ async def chat(request: Request, body: ChatRequest, db: AsyncSession = Depends(g
         )
     except httpx.HTTPStatusError as exc:
         raise HTTPException(status_code=exc.response.status_code, detail=exc.response.text)
+
+    # Phase 2: Persist updated context back to MySQL with optimistic concurrency control
+    returned_context = rust_resp.get("context")
+    if returned_context is not None:
+        try:
+            await conversation_service.save_conversation_context(
+                db,
+                conv.conversation_id,
+                returned_context,
+                expected_version=context_version,
+                schema_version=schema_version,
+            )
+        except conversation_service.ConcurrencyConflictError:
+            # Safe concurrency resolution: reload newest version and save latest state
+            _, latest_version, _ = await conversation_service.get_conversation_context(
+                db, conv.conversation_id
+            )
+            await conversation_service.save_conversation_context(
+                db,
+                conv.conversation_id,
+                returned_context,
+                expected_version=latest_version,
+                schema_version=schema_version,
+            )
 
     # Parse step traces
     steps = [

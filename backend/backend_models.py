@@ -45,6 +45,26 @@ class Conversation(Base):
     messages: Mapped[list["Message"]] = relationship(
         "Message", back_populates="conversation", order_by="Message.sequence_number"
     )
+    context: Mapped["ConversationContext | None"] = relationship(
+        "ConversationContext", back_populates="conversation", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class ConversationContext(Base):
+    __tablename__ = "ConversationContexts"
+
+    conversation_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("Conversations.conversation_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    context_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
+
+    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="context")
 
 
 class Message(Base):
