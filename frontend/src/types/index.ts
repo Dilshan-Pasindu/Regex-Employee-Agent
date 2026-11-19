@@ -8,6 +8,21 @@ export interface StepTrace {
   value: unknown;
 }
 
+export interface ExecutionPlanStep {
+  step_number: number;
+  description: string;
+  tool_name?: string | null;
+  arguments?: Record<string, unknown> | null;
+}
+
+export interface ExecutionPlan {
+  intent_label?: string;
+  steps: ExecutionPlanStep[];
+  requires_confirmation?: boolean;
+  extracted_conditions?: Record<string, unknown>;
+  requested_fields?: string[];
+}
+
 export interface ChatResponse {
   session_id: string;
   prompt: string;
@@ -20,6 +35,11 @@ export interface ChatResponse {
   requires_confirmation?: boolean;
   message?: string;
   suggestions?: string[];
+  request_id?: string;
+  status?: string;
+  error_code?: string;
+  correlation_id?: string;
+  execution_plan?: ExecutionPlan | null;
 }
 
 export interface ChatMessage {
@@ -46,4 +66,34 @@ export interface ConfirmationState {
   intent: string;
   params: Record<string, unknown>;
   sessionId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — Persistent conversation types
+// ---------------------------------------------------------------------------
+
+export interface ConversationSummary {
+  conversation_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  last_message_at: string | null;
+  is_pinned: boolean;
+  pinned_at: string | null;
+}
+
+export interface PersistedMessage {
+  message_id: string;
+  sequence_number: number;
+  role: string;        // "user" | "assistant"
+  content: string;
+  intent: string | null;
+  success: boolean | null;
+  metadata_json?: string | null;
+  created_at: string;
+  status?: string;
+  request_id?: string | null;
+  error_code?: string | null;
+  processing_started_at?: string | null;
+  processing_completed_at?: string | null;
 }

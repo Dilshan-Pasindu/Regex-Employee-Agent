@@ -2,7 +2,7 @@
 // api/client.ts — Axios-free fetch wrapper for the FastAPI backend (port 5000)
 // =============================================================================
 
-import type { ChatResponse, McpTool } from '../types';
+import type { ChatResponse, McpTool, ConversationSummary, PersistedMessage } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
 
@@ -23,10 +23,20 @@ export async function sendChat(
   prompt: string,
   confirmed = false,
   sessionId?: string,
+  requestId?: string,
+  correlationId?: string,
 ): Promise<ChatResponse> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (correlationId) headers['X-Correlation-ID'] = correlationId;
   return request<ChatResponse>('/api/chat', {
     method: 'POST',
-    body: JSON.stringify({ prompt, confirmed, session_id: sessionId }),
+    headers,
+    body: JSON.stringify({
+      prompt,
+      confirmed,
+      session_id: sessionId,
+      request_id: requestId,
+    }),
   });
 }
 
@@ -38,4 +48,80 @@ export async function fetchTools(): Promise<{ tools: McpTool[]; count: number }>
 // GET /api/health
 export async function fetchHealth(): Promise<Record<string, unknown>> {
   return request<Record<string, unknown>>('/api/health');
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1 — Conversation management API
+// ---------------------------------------------------------------------------
+
+export async function createConversation(title?: string): Promise<ConversationSummary> {
+  return request<ConversationSummary>('/api/conversations', {
+    method: 'POST',
+    body: JSON.stringify({ title: title ?? null }),
+  });
+}
+
+export async function listConversations(
+  page = 1,
+  pageSize = 30,
+): Promise<{ conversations: ConversationSummary[]; page: number; page_size: number }> {
+  const params = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  return request<{ conversations: ConversationSummary[]; page: number; page_size: number }>(
+    `/api/conversations?${params}`,
+  );
+}
+
+export async function searchConversations(q: string): Promise<{ conversations: ConversationSummary[] }> {
+  return request<{ conversations: ConversationSummary[] }>(
+    `/api/conversations/search?q=${encodeURIComponent(q)}`,
+  );
+}
+
+export async function renameConversation(id: string, title: string): Promise<ConversationSummary> {
+  return request<ConversationSummary>(`/api/conversations/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ title }),
+  });
+}
+
+export async function pinConversation(id: string, pinned: boolean): Promise<ConversationSummary> {
+  return request<ConversationSummary>(`/api/conversations/${id}/pin`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pinned }),
+  });
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  await request<unknown>(`/api/conversations/${id}`, { method: 'DELETE' });
+}
+
+export async function getConversationContext(
+  id: string,
+): Promise<{ conversation_id: string; version: number; schema_version: number; context: Record<string, unknown> }> {
+  return request<{ conversation_id: string; version: number; schema_version: number; context: Record<string, unknown> }>(
+    `/api/conversations/${id}/context`,
+  );
+}
+
+export async function getConversationMessages(
+  id: string,
+  page = 1,
+  pageSize = 50,
+): Promise<{ conversation_id: string; messages: PersistedMessage[]; page: number; page_size: number }> {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+  return request<{ conversation_id: string; messages: PersistedMessage[]; page: number; page_size: number }>(
+    `/api/conversations/${id}/messages?${params}`,
+  );
+}
+
+export async function getConversationSnapshots(
+  id: string,
+  limit = 20,
+): Promise<{ conversation_id: string; snapshots: Array<{ snapshot_id: string; context_version: number; message_sequence_number: number; schema_version: number; snapshot: Record<string, unknown>; created_at: string }> }> {
+  return request<{ conversation_id: string; snapshots: unknown[] }>(
+    `/api/conversations/${id}/snapshots?limit=${limit}`,
+  ) as Promise<{ conversation_id: string; snapshots: Array<{ snapshot_id: string; context_version: number; message_sequence_number: number; schema_version: number; snapshot: Record<string, unknown>; created_at: string }> }>;
 }

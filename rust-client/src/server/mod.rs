@@ -56,6 +56,10 @@ pub struct ProcessRequest {
     pub confirmed: bool,
     #[serde(default)]
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub context: Option<crate::context::conversation_context::ConversationContext>,
+    #[serde(default)]
+    pub context_version: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -82,6 +86,22 @@ pub struct ProcessResponse {
     pub suggestions: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_plan: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<crate::context::conversation_context::ConversationContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_version: Option<i64>,
+}
+
+impl ProcessResponse {
+    pub fn with_context(
+        mut self,
+        ctx: &crate::context::conversation_context::ConversationContext,
+        ver: Option<i64>,
+    ) -> Self {
+        self.context = Some(ctx.clone());
+        self.context_version = ver;
+        self
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +172,12 @@ async fn process_handler(
     }
 
     let session_id = req.session_id.unwrap_or_else(|| "default".to_string());
-    let mut context = get_or_create_context(&session_id);
+    let mut context = if let Some(in_ctx) = req.context {
+        in_ctx
+    } else {
+        get_or_create_context(&session_id)
+    };
+    let next_version = req.context_version.map(|v| v + 1).or(Some(1));
 
     // -----------------------------------------------------------------------
     // Stage 1: Conversational Context Resolution
@@ -161,50 +186,61 @@ async fn process_handler(
     let prompt = match context_action {
         ResolvedContextAction::ContextCleared => {
             clear_session_context(&session_id);
-            return Ok(Json(ProcessResponse {
-                prompt: raw_prompt,
-                intent: "clear_context".to_string(),
-                tool: None,
-                params: json!({}),
-                steps: vec![Step {
-                    step: 1,
-                    label: "Context Cleared".into(),
-                    value: json!("Conversation memory reset"),
-                }],
-                result: None,
-                success: true,
-                requires_confirmation: None,
-                message: Some("Conversation context has been cleared.".to_string()),
-                suggestions: None,
-                execution_plan: None,
-            }));
+            context.clear();
+            return Ok(Json(
+                ProcessResponse {
+                    prompt: raw_prompt,
+                    intent: "clear_context".to_string(),
+                    tool: None,
+                    params: json!({}),
+                    steps: vec![Step {
+                        step: 1,
+                        label: "Context Cleared".into(),
+                        value: json!("Conversation memory reset"),
+                    }],
+                    result: None,
+                    success: true,
+                    requires_confirmation: None,
+                    message: Some("Conversation context has been cleared.".to_string()),
+                    suggestions: None,
+                    execution_plan: None,
+                    context: None,
+                    context_version: None,
+                }
+                .with_context(&context, next_version),
+            ));
         }
         ResolvedContextAction::InMemoryProjection { requested_fields } => {
             if let Some(ref data) = context.last_result_data {
                 let projected = project_fields(data, &requested_fields);
                 context.last_requested_fields = requested_fields.clone();
-                update_context(&session_id, context);
+                update_context(&session_id, context.clone());
 
-                return Ok(Json(ProcessResponse {
-                    prompt: raw_prompt,
-                    intent: "filter_previous_result".to_string(),
-                    tool: None,
-                    params: json!({ "requestedFields": requested_fields }),
-                    steps: vec![Step {
-                        step: 1,
-                        label: "In-Memory Projection".into(),
-                        value: json!(requested_fields),
-                    }],
-                    result: Some(projected),
-                    success: true,
-                    requires_confirmation: None,
-                    message: Some(format!(
-                        "Filtered previous search results to {}.",
-                        requested_fields.join(", ")
-                    )),
-                    suggestions: None,
-                    execution_plan: None,
-                }));
+                return Ok(Json(
+                    ProcessResponse {
+                        prompt: raw_prompt,
+                        intent: "filter_previous_result".to_string(),
+                        tool: None,
+                        params: json!({ "requestedFields": requested_fields }),
+                        steps: vec![Step {
+                            step: 1,
+                            label: "In-Memory Projection".into(),
+                            value: json!(requested_fields),
+                        }],
+                        result: Some(projected),
+                        success: true,
+                        requires_confirmation: None,
+                        message: Some(format!(
+                            "Filtered previous search results to {}.",
+                            requested_fields.join(", ")
+                        )),
+                        suggestions: None,
+                        execution_plan: None,
+                        context: None,
+                        context_version: None,
+                    }
+                    .with_context(&context, next_version),
+                ));
             }
             raw_prompt
         }
@@ -243,21 +279,26 @@ async fn process_handler(
     if matches!(intent_result.intent, Intent::Unknown(_)) {
         let suggestion_out = generate_suggestions(&prompt, &intent_result, &context);
         context.record_failure();
-        update_context(&session_id, context);
+        update_context(&session_id, context.clone());
 
-        return Ok(Json(ProcessResponse {
-            prompt,
-            intent: intent_name,
-            tool: None,
-            params: params_json,
-            steps,
-            result: None,
-            success: false,
-            requires_confirmation: None,
-            message: Some(suggestion_out.explanation),
-            suggestions: Some(suggestion_out.suggestions),
-            execution_plan: None,
-        }));
+        return Ok(Json(
+            ProcessResponse {
+                prompt,
+                intent: intent_name,
+                tool: None,
+                params: params_json,
+                steps,
+                result: None,
+                success: false,
+                requires_confirmation: None,
+                message: Some(suggestion_out.explanation),
+                suggestions: Some(suggestion_out.suggestions),
+                execution_plan: None,
+                context: None,
+                context_version: None,
+            }
+            .with_context(&context, next_version),
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -270,25 +311,30 @@ async fn process_handler(
     if !validation.is_valid {
         let suggestion_out = generate_suggestions(&prompt, &intent_result, &context);
         context.record_failure();
-        update_context(&session_id, context);
+        update_context(&session_id, context.clone());
 
-        return Ok(Json(ProcessResponse {
-            prompt,
-            intent: intent_name,
-            tool: None,
-            params: params_json,
-            steps,
-            result: None,
-            success: false,
-            requires_confirmation: None,
-            message: Some(if !suggestion_out.explanation.is_empty() {
-                suggestion_out.explanation
-            } else {
-                validation.errors.join("; ")
-            }),
-            suggestions: Some(suggestion_out.suggestions),
-            execution_plan: Some(json!(plan)),
-        }));
+        return Ok(Json(
+            ProcessResponse {
+                prompt,
+                intent: intent_name,
+                tool: None,
+                params: params_json,
+                steps,
+                result: None,
+                success: false,
+                requires_confirmation: None,
+                message: Some(if !suggestion_out.explanation.is_empty() {
+                    suggestion_out.explanation
+                } else {
+                    validation.errors.join("; ")
+                }),
+                suggestions: Some(suggestion_out.suggestions),
+                execution_plan: Some(json!(plan)),
+                context: None,
+                context_version: None,
+            }
+            .with_context(&context, next_version),
+        ));
     }
 
     // Write operations — confirmation gate
@@ -302,43 +348,53 @@ async fn process_handler(
         // Special handling for Undo confirmation preview
         if let Intent::UndoLastUpdate = intent_result.intent {
             if let Some(ref undo) = context.last_undo {
-                return Ok(Json(ProcessResponse {
-                    prompt,
-                    intent: intent_name,
-                    tool: Some("update_employee".to_string()),
-                    params: params_json,
-                    steps,
-                    result: Some(json!({
-                        "employeeId": undo.employee_id,
-                        "field": undo.field_to_update,
-                        "revertingTo": undo.previous_value,
-                    })),
-                    success: false,
-                    requires_confirmation: Some(true),
-                    message: Some(format!(
-                        "Revert {} for employee {} back to {}?",
-                        undo.field_to_update, undo.employee_id, undo.previous_value
-                    )),
-                    suggestions: None,
-                    execution_plan: Some(json!(plan)),
-                }));
+                return Ok(Json(
+                    ProcessResponse {
+                        prompt,
+                        intent: intent_name,
+                        tool: Some("update_employee".to_string()),
+                        params: params_json,
+                        steps,
+                        result: Some(json!({
+                            "employeeId": undo.employee_id,
+                            "field": undo.field_to_update,
+                            "revertingTo": undo.previous_value,
+                        })),
+                        success: false,
+                        requires_confirmation: Some(true),
+                        message: Some(format!(
+                            "Revert {} for employee {} back to {}?",
+                            undo.field_to_update, undo.employee_id, undo.previous_value
+                        )),
+                        suggestions: None,
+                        execution_plan: Some(json!(plan)),
+                        context: None,
+                        context_version: None,
+                    }
+                    .with_context(&context, next_version),
+                ));
             } else {
-                return Ok(Json(ProcessResponse {
-                    prompt,
-                    intent: intent_name,
-                    tool: None,
-                    params: params_json,
-                    steps,
-                    result: None,
-                    success: false,
-                    requires_confirmation: None,
-                    message: Some(
-                        "Nothing to undo: no previous update operations found in this session."
-                            .to_string(),
-                    ),
-                    suggestions: None,
-                    execution_plan: None,
-                }));
+                return Ok(Json(
+                    ProcessResponse {
+                        prompt,
+                        intent: intent_name,
+                        tool: None,
+                        params: params_json,
+                        steps,
+                        result: None,
+                        success: false,
+                        requires_confirmation: None,
+                        message: Some(
+                            "Nothing to undo: no previous update operations found in this session."
+                                .to_string(),
+                        ),
+                        suggestions: None,
+                        execution_plan: None,
+                        context: None,
+                        context_version: None,
+                    }
+                    .with_context(&context, next_version),
+                ));
             }
         }
 
@@ -377,22 +433,29 @@ async fn process_handler(
                 )),
                 suggestions: None,
                 execution_plan: Some(json!(plan)),
-            }));
+                context: None,
+                context_version: None,
+            }.with_context(&context, next_version)));
         }
 
-        return Ok(Json(ProcessResponse {
-            prompt,
-            intent: intent_name,
-            tool: intent_result.intent.tool_name().map(|s| s.to_string()),
-            params: params_json,
-            steps,
-            result: None,
-            success: false,
-            requires_confirmation: Some(true),
-            message: Some("Please confirm this write operation.".to_string()),
-            suggestions: None,
-            execution_plan: Some(json!(plan)),
-        }));
+        return Ok(Json(
+            ProcessResponse {
+                prompt,
+                intent: intent_name,
+                tool: intent_result.intent.tool_name().map(|s| s.to_string()),
+                params: params_json,
+                steps,
+                result: None,
+                success: false,
+                requires_confirmation: Some(true),
+                message: Some("Please confirm this write operation.".to_string()),
+                suggestions: None,
+                execution_plan: Some(json!(plan)),
+                context: None,
+                context_version: None,
+            }
+            .with_context(&context, next_version),
+        ));
     }
 
     // Capture undo snapshot before executing update_employee
@@ -458,24 +521,29 @@ async fn process_handler(
                 }
             }
             let res = client.call_tool("update_employee", json!(undo_args)).await;
-            update_context(&session_id, context);
+            update_context(&session_id, context.clone());
             return match res {
-                Ok(r) => Ok(Json(ProcessResponse {
-                    prompt,
-                    intent: intent_name,
-                    tool: Some("update_employee".to_string()),
-                    params: params_json,
-                    steps,
-                    result: r.data,
-                    success: r.success,
-                    requires_confirmation: None,
-                    message: Some(format!(
-                        "Successfully reverted {} for employee {} back to {}.",
-                        undo.field_to_update, undo.employee_id, undo.previous_value
-                    )),
-                    suggestions: None,
-                    execution_plan: Some(json!(plan)),
-                })),
+                Ok(r) => Ok(Json(
+                    ProcessResponse {
+                        prompt,
+                        intent: intent_name,
+                        tool: Some("update_employee".to_string()),
+                        params: params_json,
+                        steps,
+                        result: r.data,
+                        success: r.success,
+                        requires_confirmation: None,
+                        message: Some(format!(
+                            "Successfully reverted {} for employee {} back to {}.",
+                            undo.field_to_update, undo.employee_id, undo.previous_value
+                        )),
+                        suggestions: None,
+                        execution_plan: Some(json!(plan)),
+                        context: None,
+                        context_version: None,
+                    }
+                    .with_context(&context, next_version),
+                )),
                 Err(e) => Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(json!({ "error": e.to_string() })),
@@ -512,23 +580,28 @@ async fn process_handler(
                         }
                     }
                 }
-                update_context(&session_id, context);
-                return Ok(Json(ProcessResponse {
-                    prompt,
-                    intent: intent_name,
-                    tool: Some("update_employee".to_string()),
-                    params: params_json,
-                    steps,
-                    result: Some(json!({ "batchUpdatedCount": updated_count })),
-                    success: true,
-                    requires_confirmation: None,
-                    message: Some(format!(
-                        "Successfully applied batch update to {} employee(s).",
-                        updated_count
-                    )),
-                    suggestions: None,
-                    execution_plan: Some(json!(plan)),
-                }));
+                update_context(&session_id, context.clone());
+                return Ok(Json(
+                    ProcessResponse {
+                        prompt,
+                        intent: intent_name,
+                        tool: Some("update_employee".to_string()),
+                        params: params_json,
+                        steps,
+                        result: Some(json!({ "batchUpdatedCount": updated_count })),
+                        success: true,
+                        requires_confirmation: None,
+                        message: Some(format!(
+                            "Successfully applied batch update to {} employee(s).",
+                            updated_count
+                        )),
+                        suggestions: None,
+                        execution_plan: Some(json!(plan)),
+                        context: None,
+                        context_version: None,
+                    }
+                    .with_context(&context, next_version),
+                ));
             }
         }
     }
@@ -614,10 +687,10 @@ async fn process_handler(
                     }
                     _ => {}
                 }
-                update_context(&session_id, context);
+                update_context(&session_id, context.clone());
             } else {
                 context.record_failure();
-                update_context(&session_id, context);
+                update_context(&session_id, context.clone());
             }
 
             // Multi-result disambiguation suggestions (Feature 2)
@@ -659,21 +732,26 @@ async fn process_handler(
                 None
             };
 
-            Ok(Json(ProcessResponse {
-                prompt,
-                intent: intent_name,
-                tool: intent_result.intent.tool_name().map(|s| s.to_string()),
-                params: params_json,
-                steps,
-                result: outcome
-                    .data
-                    .or_else(|| outcome.message.as_ref().map(|m| json!({ "message": m }))),
-                success: outcome.success,
-                requires_confirmation: None,
-                message: outcome.message,
-                suggestions: disambiguation_suggestions,
-                execution_plan: Some(json!(plan)),
-            }))
+            Ok(Json(
+                ProcessResponse {
+                    prompt,
+                    intent: intent_name,
+                    tool: intent_result.intent.tool_name().map(|s| s.to_string()),
+                    params: params_json,
+                    steps,
+                    result: outcome
+                        .data
+                        .or_else(|| outcome.message.as_ref().map(|m| json!({ "message": m }))),
+                    success: outcome.success,
+                    requires_confirmation: None,
+                    message: outcome.message,
+                    suggestions: disambiguation_suggestions,
+                    execution_plan: Some(json!(plan)),
+                    context: None,
+                    context_version: None,
+                }
+                .with_context(&context, next_version),
+            ))
         }
         Err(e) => {
             context.record_failure();

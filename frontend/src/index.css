@@ -97,6 +97,12 @@ html, body {
   50%       { box-shadow: 0 0 0 6px rgba(124,58,237,0); }
 }
 
+@keyframes micPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.5); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
 .msg-enter {
   animation: slideUp 0.25s ease-out both;
 }

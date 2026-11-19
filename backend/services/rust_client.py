@@ -13,7 +13,14 @@ RUST_SERVICE_URL = os.getenv("RUST_SERVICE_URL", "http://localhost:5001")
 _TIMEOUT = 30.0  # seconds
 
 
-async def process_prompt(prompt: str, confirmed: bool = False, session_id: Optional[str] = None) -> Dict[str, Any]:
+async def process_prompt(
+    prompt: str,
+    confirmed: bool = False,
+    session_id: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None,
+    context_version: Optional[int] = None,
+    correlation_id: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     POST /process to the Rust HTTP service.
     Returns the full JSON response as a dict.
@@ -23,9 +30,17 @@ async def process_prompt(prompt: str, confirmed: bool = False, session_id: Optio
         payload: Dict[str, Any] = {"prompt": prompt, "confirmed": confirmed}
         if session_id:
             payload["session_id"] = session_id
+        if context is not None:
+            payload["context"] = context
+        if context_version is not None:
+            payload["context_version"] = context_version
+        headers = {}
+        if correlation_id:
+            headers["X-Correlation-ID"] = correlation_id
         resp = await client.post(
             f"{RUST_SERVICE_URL}/process",
             json=payload,
+            headers=headers,
         )
         resp.raise_for_status()
         return resp.json()

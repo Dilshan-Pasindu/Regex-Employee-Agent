@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
     prompt: str = Field(..., min_length=1, description="Natural-language employee management command")
     confirmed: bool = Field(False, description="Set true to confirm a pending write operation")
     session_id: Optional[str] = Field(None, description="Session ID for conversation continuity (auto-generated if absent)")
+    conversation_id: Optional[str] = Field(None, description="Alias for session_id")
+    request_id: Optional[str] = Field(None, description="Unique client request ID for idempotency")
 
 
 # ---------------------------------------------------------------------------
@@ -46,6 +48,11 @@ class ChatResponse(BaseModel):
     requires_confirmation: Optional[bool] = None
     message: Optional[str] = None
     suggestions: Optional[List[str]] = None
+    request_id: Optional[str] = None
+    status: Optional[str] = None
+    error_code: Optional[str] = None
+    correlation_id: Optional[str] = None
+    execution_plan: Optional[Dict[str, Any]] = None
 
 
 # ---------------------------------------------------------------------------

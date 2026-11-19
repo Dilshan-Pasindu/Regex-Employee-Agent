@@ -3,6 +3,7 @@
 // =============================================================================
 
 import { useState } from 'react';
+import { Copy, Check, Download } from 'lucide-react';
 
 type Row = Record<string, unknown>;
 
@@ -128,10 +129,11 @@ export function EmployeeTable({ data }: Props) {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 5,
             }}
           >
-            📋 {copied ? 'Copied TSV!' : 'Copy TSV'}
+            {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+            <span>{copied ? 'Copied TSV!' : 'Copy TSV'}</span>
           </button>
           <button
             onClick={downloadCsv}
@@ -146,10 +148,11 @@ export function EmployeeTable({ data }: Props) {
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: 4,
+              gap: 5,
             }}
           >
-            📥 Export CSV
+            <Download size={12} />
+            <span>Export CSV</span>
           </button>
         </div>
       </div>
